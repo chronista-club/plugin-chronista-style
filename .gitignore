@@ -7,3 +7,10 @@
 # VS Code Mermaid 拡張が自動生成する Copilot instructions（プラグインとは無関係）
 .github/copilot-instructions.md
 .github/instructions/
+
+# Python hook/test bytecode
+__pycache__/
+
+# Validation environment and distribution output
+.venv/
+dist/

@@ -4,9 +4,21 @@
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に準拠する。
 
 プラグイン全体の version は `.claude-plugin/plugin.json` を正とする（SSoT）。
-各スキル個別の version は該当 `SKILL.md` の frontmatter に記載。
+各スキル個別の version は該当 `SKILL.md` の `metadata.version` に記載。
 
 ## [Unreleased]
+
+### Added
+- manifest 同期・検証・配布 ZIP 作成コマンドと CI を追加。公開 GitHub marketplace からの両環境の導入・更新手順を記載。
+- Claude Code / Codex の Stop ログ読み替えと hook 回帰テスト、共通の記憶接続ガイドを追加。
+- Codex 用 manifest を追加し、共通の `skills/` を参照。
+- `spark` / `sdg` / `release` の共有スキルを追加。
+
+### Changed
+- 新しい正本 `plugin-chronista-style` に合わせて両 manifest の repository/homepage と導入・設計文書を更新。配布準備中と Grok 未検証の状態を明記。
+- SessionStart は入力の cwd を優先。記憶の自動注入を条件付きにし、未接続時の扱いを明記。Stop は最終メッセージ入力を優先し、差し戻しループを防止。
+- Claude のコマンドは共有スキルへの入口に統一。codeflow の起動手順もスキルへ集約。
+- 質問・worktree・合議のツール指定を実行環境に対応。スキルの版・タグ・出典を `metadata` に移動。
 
 ## [0.31.1] - 2026-09-06
 

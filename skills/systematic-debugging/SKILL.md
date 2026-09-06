@@ -1,8 +1,9 @@
 ---
 name: systematic-debugging
 description: バグ、テスト失敗、予期しない挙動に遭遇した時に使用。修正提案の前に根本原因を特定する規律スキル。
-version: 1.1.0
-tags: [discipline, debugging, root-cause, systematic]
+metadata:
+  version: "1.1.0"
+  tags: "discipline, debugging, root-cause, systematic"
 ---
 
 # Systematic Debugging

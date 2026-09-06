@@ -2,13 +2,21 @@
 
 Chronista のプロダクト群を横断する**共通の開発スタイル基盤**。どのプロダクトでも同じ流儀で「強く美しいプロダクト」に育てていくために、Spark → Conception → GO の開発フロー・Living Documentation・規律スキル（TDD / デバッグ / 検証）を統合する。
 
-> **バージョン**: プラグイン本体は `.claude-plugin/plugin.json` を、各スキルは個別の `SKILL.md` frontmatter を参照。履歴は [CHANGELOG.md](./CHANGELOG.md) に記録。
+> **バージョン**: プラグイン本体は `.claude-plugin/plugin.json` を、各スキルは個別の `SKILL.md` の `metadata.version` を参照。履歴は [CHANGELOG.md](./CHANGELOG.md) に記録。
 
 ## インストール
 
-```bash
-/install chronista-club/claude-plugin-chronista-style
-```
+Claude Code / Codex で共通の `skills/` を使う。導入・更新・MCP 接続の手順は [インストールと更新](docs/guide/01-installation.md) を参照。
+
+開発の正本は [plugin-chronista-style](https://github.com/chronista-club/plugin-chronista-style)。配布先は [chronista-plugins](https://github.com/chronista-club/chronista-plugins) marketplace とする。旧本体 repo は現状のまま残し、新しい変更はこの repo で行う。
+
+現在は移植準備中。新 repo と marketplace からの配布は未開始。
+
+| 環境 | 対応状況 |
+|---|---|
+| Claude Code | 共有スキル・hooks の実装あり。新配布先での実機確認待ち。ローカル確認は `claude --plugin-dir .` |
+| Codex | manifest・共有スキル・hooks の実装あり。新配布先での実機確認待ち |
+| Grok Build | Claude 互換を基本として確認予定。専用構成は差分が必要になった場合に追加。実機では未検証 |
 
 ## スキル一覧
 
@@ -21,18 +29,21 @@ Chronista のプロダクト群を横断する**共通の開発スタイル基�
 | `tdd` | 規律 | テストファーストで実装する RED-GREEN-REFACTOR サイクル |
 | `systematic-debugging` | 規律 | 根本原因を特定してから修正する 4 ステップデバッグ |
 | `verification` | 規律 | 証拠なき完了宣言を防ぐ。検証コマンド実行 → 出力確認 → 主張 |
+| `spark` | 入口 | 原文のアイデアを記憶へ保存 |
+| `sdg` | 入口 | spec / design / guide の文書生成 |
+| `release` | 出荷 | 版・CHANGELOG・tag・リリース手順 |
 | `council` | AI 協働 | 4 voice の合議で意思決定。多義的なトレードオフや go/no-go 判断に |
 
 規律 3 スキルは該当場面で省略しない。それ以外の該当判断はモデルに委ねる。
 
-## コマンド
+## 呼び出し
 
-| コマンド | 説明 |
+| Claude Code / Codex | 説明 |
 |----------|------|
-| `/spark` | 降ってきたアイデアを解釈ゼロで memory に pack。一手で終わる |
-| `/codeflow` | 開発セッションを開始。理解を提示してから該当ステップに入る |
-| `/sdg` | spec / design / guide のひな形を `docs/` に起こす |
-| `/release` | リリースの背骨（版・CHANGELOG・nightly → main・tag・GitHub Release）。尻尾はプロジェクト側に委譲 |
+| `/chronista-style:spark` / `$spark` | 降ってきたアイデアを解釈ゼロで memory に pack。一手で終わる |
+| `/chronista-style:codeflow` / `$codeflow` | 開発セッションを開始。理解を提示してから該当ステップに入る |
+| `/chronista-style:sdg` / `$sdg` | spec / design / guide のひな形を `docs/` に起こす |
+| `/chronista-style:release` / `$release` | リリースの背骨（版・CHANGELOG・nightly → main・tag・GitHub Release）。尻尾はプロジェクト側に委譲 |
 
 ## 開発フロー
 
@@ -44,8 +55,10 @@ Spark（想起、どちらからでも）→ Conception（構想: 調べる・�
 
 ## hooks
 
-- **SessionStart**: git コンテキストと Atlas 候補、規律エッセンス 4 行を注入
-- **Stop**: `fabrication-tripwire.sh` — 観測していないツール出力を最終メッセージに書いたら差し戻す（fail-open）
+- **SessionStart**: git コンテキストと Atlas 候補、規律エッセンスを注入
+- **Stop**: `fabrication-tripwire.sh` — 観測していないツール出力を最終メッセージに書いたら差し戻す（fail-open、同一ターンの差し戻しは一回まで）
+
+hooks は bash / git / jq / Python 3 が必要。Codex では hook 定義の信頼設定も必要。
 
 ## 関連プラグイン
 

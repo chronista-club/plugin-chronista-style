@@ -1,15 +1,16 @@
 ---
 name: spec-design-guide
 description: spec（What & Why）・design（How）・guide（Usage）を docs/ に書き、コードと同じ PR で育てる Living Documentation の規律。設計に触れる変更のときに使う。
-version: 2.0.0
-tags: [documentation, spec, design, guide, living-documentation]
+metadata:
+  version: "2.0.0"
+  tags: "documentation, spec, design, guide, living-documentation"
 ---
 
 # Spec-Design-Guide (SDG)
 
 > **ドキュメントは死んだテキストではなく、生きたコードベースの鏡である。**
 
-エイリアス: `spec-design-guide` / `sdg`。明示的に呼ぶなら `/sdg`。
+文書の起動手順は [sdg スキル](../sdg/SKILL.md)。Claude Code では `/sdg`、Codex では `$sdg` で呼び出す。
 
 ## 目的 — 3 つを分ける
 

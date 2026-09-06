@@ -15,5 +15,15 @@
     "sdg",
     "documentation"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Chronista Style",
+    "shortDescription": "Chronista の開発フロー・設計・検証スキル",
+    "longDescription": "Chronista development workflow shared across products - Spark → Conception → GO flow, SDG documentation, and discipline skills",
+    "developerName": "Chronista Club",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Chronista Style を使って開発を進めてください。"
+  }
 }
