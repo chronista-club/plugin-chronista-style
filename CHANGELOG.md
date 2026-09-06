@@ -8,6 +8,8 @@
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-09-06
+
 ### Added
 - manifest 同期・検証・配布 ZIP 作成コマンドと CI を追加。公開 GitHub marketplace からの両環境の導入・更新手順を記載。
 - Claude Code / Codex の Stop ログ読み替えと hook 回帰テスト、共通の記憶接続ガイドを追加。

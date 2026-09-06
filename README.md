@@ -10,7 +10,7 @@ Claude Code / Codex で共通の `skills/` を使う。導入・更新・MCP 接
 
 開発の正本は [plugin-chronista-style](https://github.com/chronista-club/plugin-chronista-style)。配布先は [chronista-plugins](https://github.com/chronista-club/chronista-plugins) marketplace とする。旧本体 repo は現状のまま残し、新しい変更はこの repo で行う。
 
-現在は移植準備中。新 repo と marketplace からの配布は未開始。
+本体 v0.32.0 は GitHub Release の ZIP として配布する。新 marketplace への掲載と、そこからの導入確認は準備中。
 
 | 環境 | 対応状況 |
 |---|---|

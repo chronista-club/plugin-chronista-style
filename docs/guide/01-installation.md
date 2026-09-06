@@ -6,7 +6,7 @@
 
 ## 配布状況
 
-本体の正本は [plugin-chronista-style](https://github.com/chronista-club/plugin-chronista-style)、配布カタログは [chronista-plugins](https://github.com/chronista-club/chronista-plugins)。現在は移植準備中で、新配布先からの導入は未提供。以下の marketplace 導入・更新コマンドは、両 repo の配布内容を公開してから使う。
+本体の正本は [plugin-chronista-style](https://github.com/chronista-club/plugin-chronista-style)、配布カタログは [chronista-plugins](https://github.com/chronista-club/chronista-plugins)。本体 v0.32.0 は GitHub Release の ZIP として配布する。marketplace 経由の導入は準備中。以下の marketplace 導入・更新コマンドは、新カタログへの掲載と導入確認が済んでから使う。
 
 旧 `claude-plugin-chronista-style` は現状のまま残し、新しい変更は新 repo で行う。旧 marketplace を更新しても新 repo の変更は受け取れない。
 

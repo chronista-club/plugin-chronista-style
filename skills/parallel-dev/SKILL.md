@@ -2,7 +2,7 @@
 name: parallel-dev
 description: 並列開発の作業単位を決めるとき、スコープが混ざったとき、worktree / VP lane / stacked PR のどれを使うか迷ったときに使用。「隔離・出荷」2層モデルで道具を選ぶ判断スキル。
 metadata:
-  version: "0.2.1"
+  version: "0.2.2"
   tags: "parallel, worktree, vantage-point, stacked-pr, workflow"
 ---
 

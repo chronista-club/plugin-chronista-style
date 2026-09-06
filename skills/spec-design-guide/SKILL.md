@@ -2,7 +2,7 @@
 name: spec-design-guide
 description: spec（What & Why）・design（How）・guide（Usage）を docs/ に書き、コードと同じ PR で育てる Living Documentation の規律。設計に触れる変更のときに使う。
 metadata:
-  version: "2.0.0"
+  version: "2.0.1"
   tags: "documentation, spec, design, guide, living-documentation"
 ---
 

@@ -51,3 +51,4 @@ Codex の [公式 Hooks 仕様](https://learn.chatgpt.com/docs/hooks) と手元�
 - 2026-09-06: 第3段階の公開カタログ、同期・検証・パッケージ作成と CI を整備。公開・実アプリ確認は未実施。
 - 2026-09-06: 公開先は改名せず新設する方針に変更。まず Codex personal への導入と Claude ローカル hook 起動を確認。公開カタログはローカルひな形まで。
 - 2026-09-06: 本体を plugin-chronista-style に新設して正本化。履歴と未コミット作業を引継ぎ、両 manifest の URL と導入文書を新配布先へ更新。Grok は未検証。カタログ更新・commit/push・新配布先での実機確認は未実施。
+- 2026-09-06: v0.32.0 として新本体をリリース。既存8スキルを patch 更新し、新規3スキルは 1.0.0。GitHub Release に ZIP を配布。marketplace 掲載と実機確認は後続のため Draft を維持。

@@ -2,7 +2,7 @@
 name: verification
 description: 作業の完了を宣言する前に使用。証拠なき完了宣言を防ぐ規律スキル。
 metadata:
-  version: "1.3.0"
+  version: "1.3.1"
   tags: "discipline, verification, completion, evidence, fabrication"
 ---
 

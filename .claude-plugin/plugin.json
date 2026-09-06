@@ -1,7 +1,7 @@
 {
   "name": "chronista-style",
   "description": "Chronista development workflow shared across products - Spark → Conception → GO flow, SDG documentation, and discipline skills",
-  "version": "0.31.1",
+  "version": "0.32.0",
   "author": {
     "name": "Mako",
     "email": "mito@chronista.club"
