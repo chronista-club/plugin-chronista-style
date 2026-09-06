@@ -1,8 +1,9 @@
 ---
 name: parallel-dev
 description: 並列開発の作業単位を決めるとき、スコープが混ざったとき、worktree / VP lane / stacked PR のどれを使うか迷ったときに使用。「隔離・出荷」2層モデルで道具を選ぶ判断スキル。
-version: 0.2.1
-tags: [parallel, worktree, vantage-point, stacked-pr, workflow]
+metadata:
+  version: "0.2.2"
+  tags: "parallel, worktree, vantage-point, stacked-pr, workflow"
 ---
 
 # 隔離・出荷 — 並列開発2層モデル
@@ -27,7 +28,7 @@ worktree は「作業ディレクトリごと分ける」ので、隔離は構�
 ## 判断ルール
 
 1. **小タスク（1セッションで完結）**
-   → session worktree（`EnterWorktree`）。lane には紐づけない。
+   → session worktree（Claude Code では利用可能なら `EnterWorktree`、Codex では提供されている worktree 機能か `git worktree add`）。lane には紐づけない。
 
 2. **大タスク（並列 orchestration・独立したビルド/テストが必要）**
    → 最初から VP lane（`vp flow handoff <name> --task-spec <file|->`）。

@@ -1,12 +1,9 @@
 ---
 name: chronista-style
 description: Chronista として活動するスキルセットの入口。North Star・設計哲学・基本姿勢・プロジェクト管理の規約を定義し、各スキルへ routing する。
-version: 6.1.1
-tags:
-  - chronista
-  - development
-  - workflow
-  - memory
+metadata:
+  version: "6.1.2"
+  tags: "chronista, development, workflow, memory"
 ---
 
 # Chronista Style
@@ -133,7 +130,7 @@ Action に埋まった計算は、テストできず、責務の線も引けな�
 
 > **過去を知る者だけが、未来を正しく紡げる。**
 
-**セッション開始時のコンテキストは Context Engine が自動注入される。** 開始時の手動検索は不要 — 過去を参照したくなったら `search` で掘る。
+Context Engine の記憶コンテキストが実際に届いていれば活用し、重複検索しない。未注入なら必要な経緯を接続済みの `search` で補う。記憶操作の前に [接続と未接続時の扱い](reference/memory-connection.md) を読む。未接続でも記憶に依存しない作業は続け、未取得・未保存を明記する。
 
 ### 記憶に刻むべき瞬間（`remember`）
 
@@ -144,7 +141,7 @@ Action に埋まった計算は、テストできず、責務の線も引けな�
 - 未完の物語（次に続くタスク）
 - 降ってきた火花（`/spark`。解釈せず原文のまま）
 
-→ 詳細は `creo-memories` スキルを参照
+→ API の詳細は、利用可能なら `creo-memories` スキルを参照
 
 ---
 
@@ -165,7 +162,7 @@ Action に埋まった計算は、テストできず、責務の線も引けな�
 
 ### ファイル配置の考え方
 
-- Claude Code / claudeが使うドキュメントは、公式の推奨する形式に合わせて、`.claude/`の中に配置します
+- エージェント共通の指示は `AGENTS.md`、共有スキルは `.agents/skills/` に置きます。Claude Code 固有の設定・指示は `.claude/` や `CLAUDE.md`、Codex 固有の設定は `.codex/` に配置します。プラグイン同梱スキルはプラグイン直下の `skills/` を共有します
 - プロジェクトの公式文書・ユーザドキュメントは、`docs/`の中に配置します
 
 ---

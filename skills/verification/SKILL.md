@@ -1,8 +1,9 @@
 ---
 name: verification
 description: 作業の完了を宣言する前に使用。証拠なき完了宣言を防ぐ規律スキル。
-version: 1.3.0
-tags: [discipline, verification, completion, evidence, fabrication]
+metadata:
+  version: "1.3.1"
+  tags: "discipline, verification, completion, evidence, fabrication"
 ---
 
 # Verification Before Completion
@@ -51,9 +52,9 @@ agent 環境の green だけでは閉じない変更がある — 実機のデ�
 - 捏造しにくい形で取り直す: 行数(`wc -l`)、git hash、exit code、API の state。
 
 **構造(意志の外側):** 意志は失敗の瞬間には作動しない。だから外側に関門を置く。Stop hook
-`fabrication-tripwire.sh`(本 plugin の `hooks/hooks.json`)が、ターン終了時に**最終 assistant
+`fabrication-tripwire.sh`（Python 3 が必要。本 plugin の `hooks/hooks.json`）が、有効・信頼済みの環境で、ターン終了時に**最終 assistant
 メッセージ**の「ツール出力の形をした文字列」を検出し、同じセッション内の本物の tool_result に
-裏付けが無ければ差し戻す。fail-open(壊れても全ターンを止めない)。意図的な引用だけ明示トークン
+裏付けが無ければ差し戻す。Claude Code / Codex のログを共通形式に読み替える。fail-open（ログ欠損・未知形式・解析失敗では停止させない）。同じターンの Stop 差し戻しは一回までとし、無限ループを防ぐ。検査は既知の出力パターンの有無を照合する補助であり、数値や実行成功そのものを保証しない。意図的な引用だけ明示トークン
 `TRIPWIRE-ACK` を**単独行**で置いて通す(文中の言及では解除されない。bypass は transcript に
 残る=監査可能)。非決定性の飛躍は殺さず、「観測していない結果を報告する」その一点だけを外から止める。
 

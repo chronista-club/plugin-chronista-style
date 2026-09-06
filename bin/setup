@@ -307,7 +307,7 @@ fi
 echo ""
 
 # --- プロジェクト設定ファイル（実体は共有 config store、project 側は symlink で参照） ---
-echo "📄 プロジェクト設定ファイル"
+echo "📄 Claude Code 用プロジェクト設定ファイル"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # 共有 config store: 個人設定を集約した repo の shared/ 等を CHRONISTA_SHARED_CONFIG で指す。
 # 例) export CHRONISTA_SHARED_CONFIG="$HOME/repos/<your-config-repo>/shared"
@@ -328,6 +328,11 @@ elif [ -f "$REPO_ROOT/.mcp.json.example" ]; then
 else
   echo "  • .mcp.json.example なし（skip）"
 fi
+echo ""
+
+# Codex の MCP は .mcp.json から自動コピーしない。
+echo "  • Codex のプラグイン・MCP 接続: docs/guide/01-installation.md を参照"
+echo "  • hooks の実行には bash / git / jq / python3 が必要"
 echo ""
 
 # --- 認証確認 / 残作業 ---
