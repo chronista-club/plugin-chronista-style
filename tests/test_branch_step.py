@@ -178,6 +178,17 @@ class BranchStepTest(unittest.TestCase):
         self.step("next", "g", "--no-pr")
         self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/g")
 
+    def test_gate_refuses_dirty_worktree(self):
+        self.git("checkout", "-q", "-b", "wip/d")
+        self.commit("FAIL", "FAIL")
+        self.git("config", "branch-step.test", "test ! -e FAIL")
+        (self.work / "FAIL").unlink()
+        result = self.step("next", "--no-pr", check=False)
+        self.assertNotEqual(result.returncode, 0, "未 commit の状態で門を通さない")
+        self.assertIn("commit", result.stderr)
+        self.assertEqual(self.branch(), "wip/d")
+        self.assertNotIn("review/d", self.remote_branches())
+
     def test_trunk_is_nightly_when_only_remote_has_it(self):
         clone = Path(self.tmp.name) / "clone"
         self.git("clone", "-q", str(self.origin), str(clone), cwd=Path(self.tmp.name))
@@ -312,7 +323,7 @@ class BranchStepTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("spike", result.stderr)
         self.assertNotIn("spike/x", self.remote_branches())
-        for src in ("spike/x", "HEAD", "@"):
+        for src in ("spike/x", "HEAD", "@", "spike/x~0", "spike/x^{commit}"):
             result = self.git("push", "origin", f"{src}:refs/heads/wip/x", check=False)
             self.assertNotEqual(result.returncode, 0, f"spike を別名で押すのも拒否 ({src})")
         self.assertNotIn("wip/x", self.remote_branches())

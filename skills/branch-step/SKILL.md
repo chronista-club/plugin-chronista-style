@@ -50,7 +50,7 @@ git board
 
 ### wip → review の門
 
-- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていなければ止まる
+- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていない、または未 commit の変更があれば止まる（検査した中身と push する中身を同じにする）
 - PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
 - trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じ枝」はここで思い出す
 
@@ -62,7 +62,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install
 ```
 
 - `git next` / `keep` / `drop` / `board` の alias を書く。alias は script の絶対パス（plugin の版ごとのディレクトリ）を指すので、**plugin を更新したら `install` をやり直す**
-- 今いる repo の `.git/hooks/pre-push` に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように ref 名を経由しない push は止められない（仕様）。別の pre-push が既にあれば上書きせず止まる。repo ごとに一度 `install` を走らせる
+- 今いる repo の `.git/hooks/pre-push` に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。別の pre-push が既にあれば上書きせず止まる。repo ごとに一度 `install` を走らせる
 
 ## 一覧が board
 

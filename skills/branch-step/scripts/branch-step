@@ -91,6 +91,7 @@ gate() {
   local branch="$1" wt test_cmd base changed non_docs design
   wt="$(worktree_of "$branch")"
   [ -n "$wt" ] || die "$branch はどの worktree にも checkout されていません。checkout してから（門はその作業ツリーで走る）"
+  [ -z "$(git -C "$wt" status --porcelain)" ] || die "$wt に未 commit の変更があります。commit してから（門は commit 済みの状態を見る。push されるのもそれ）"
   test_cmd="$(git config --get branch-step.test || true)"
   if [ -n "$test_cmd" ]; then
     note "門: テスト ($test_cmd) @ $wt"

@@ -62,7 +62,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 
 - 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。`install` が `git config alias.next '!<path> next'` 等を書き、今いる repo の `.git/hooks/pre-push` に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook は上書きしない
 - slug の解決: 引数無しなら今の枝（段の列でなければ失敗）。引数ありなら `spike|exp|wip|review|hotfix/<slug>` を探し、0 件と複数件は失敗
-- wip → review の門: 枝が checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていなければ止まる。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
+- wip → review の門: 枝が checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていない、または worktree に未 commit の変更があれば止まる（検査した状態と push する状態を一致させる）。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
 - PR 作成は `gh`。`--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。名前を dry-run にしなかったのは、副作用が無いと誤解させないため）
 - pre-push hook: local ref が `HEAD` / `@` なら `git symbolic-ref` で実名に解決してから判定する。local sha が全部 0（SHA-1 / SHA-256 どちらも）は削除なので通す。`<sha>:refs/heads/…` は ref 名を経由しないので止められない（仕様として SKILL.md に明記）
 - bash を選んだ理由: git subcommand と pre-push hook に runtime 依存を持ち込まない。構文は `tests/test_branch_step.py` の `test_scripts_parse` が見る（CI の `bash -n` 行はこの PR では触っていない）
@@ -82,6 +82,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 門のテストを「今いる作業ツリー」で走らせる。slug を指定して別の場所から `git next` すると、進める枝ではなく手元の状態を検査してしまう。枝が checkout されている worktree を探してそこで走らせる
 - trunk を local の ref だけで判定する。clone 直後は local に `main` しか無く、PR が main 宛てに開く（防ぎたかった事故そのもの）。origin 側も見る
 - `--dry-run` という名前で push や rename を伴う操作を提供する。下見のつもりで実行される
+- 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
 - 門を機械で厳しくしすぎる。「設計に触れたか」は人が決める。警告に留める
 
 ## 検証
@@ -93,3 +94,4 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-01: Conception の裁定を受けて Draft。`branch-step` スキル、規約の書き換え（chronista-style / parallel-dev / codeflow）、テストを同じ PR で。
 - 2026-10-01: dogfood の初回 push が token scope（`.github/workflows` の変更）で拒否され、local だけ `review/` になった。push を rename より先に変更し、CI の `bash -n` 追加はテスト側（`test_scripts_parse`）に置き換え。
 - 2026-10-01: Moody Blues のレビュー（PR #1）で再現つきの指摘 8 件。門を枝の worktree で走らせる、trunk 判定に origin を含める、hook の `HEAD:` 解決、exp→wip を push 先行に、`--dry-run` を `--print-pr` に改名、keep の push 失敗で名前を戻す、worktree 内の drop を detached で、`gh` の事前確認、`git board` alias。テスト 17 → 27 件。
+- 2026-10-01: 再検証で残った 1 件（dirty worktree の門）を修正。hook は `spike/x~0:` の revision 式も止める。テスト 28 件。

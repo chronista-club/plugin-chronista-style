@@ -2,7 +2,7 @@
 # branch-step pre-push: spike/* はローカル専用。push を拒否する。
 # インストール: branch-step install（.git/hooks/pre-push にコピーされる）
 # stdin: <local ref> <local sha> <remote ref> <remote sha> が push 対象ごとに 1 行
-# 止められないもの: <sha>:refs/heads/... のように ref 名を経由しない push（仕様）
+# 止められないもの: <sha>:refs/heads/... のように sha を直に指す push（仕様）
 status=0
 while read -r local_ref local_sha remote_ref _remote_sha; do
   case "$local_sha" in
@@ -13,7 +13,7 @@ while read -r local_ref local_sha remote_ref _remote_sha; do
     HEAD|@) local_ref=$(git symbolic-ref -q HEAD || echo "$local_ref") ;;
   esac
   case "$local_ref $remote_ref" in
-    *refs/heads/spike/*)
+    spike/*|*refs/heads/spike/*)   # spike/x、spike/x~0、spike/x^{commit} も
       echo "branch-step: spike/* はローカル専用なので push しません: $local_ref -> $remote_ref" >&2
       echo "  育てるなら git keep（exp/ へ）、見せるなら git next（wip/ へ昇格）" >&2
       status=1
