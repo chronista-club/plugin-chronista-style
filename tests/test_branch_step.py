@@ -326,6 +326,44 @@ exit 1
         self.assertNotIn("未割り当て", result.stderr)
         self.assertNotIn("unbound", result.stderr)
 
+    def test_gate_strips_git_env_so_test_cannot_touch_the_real_repo(self):
+        """事故の再現: alias 経由の子に GIT_DIR が渡り、門のテストが作る一時 repo への git が本物を触った。"""
+        self.step("install")
+        wt = Path(self.tmp.name) / "wt-env"
+        self.git("worktree", "add", "-q", "-b", "wip/env", str(wt), "nightly")
+        (wt / "e.txt").write_text("e\n")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-q", "-m", "e", cwd=wt)
+        other = Path(self.tmp.name) / "other"
+        self.git("config", "branch-step.test",
+                 f"cd {other} 2>/dev/null || mkdir {other} && cd {other} && git init -q && "
+                 "git commit -q --allow-empty -m evil && git config user.evil yes")
+        head_before = self.git("rev-parse", "HEAD", cwd=wt).stdout.strip()
+        refs_before = self.git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/main",
+                               "refs/heads/nightly", "refs/remotes/origin/main", "refs/remotes/origin/nightly").stdout
+        self.git("next", "--no-pr", cwd=wt)
+        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/env")
+        self.assertEqual(self.git("rev-parse", "HEAD", cwd=wt).stdout.strip(), head_before, "本物の HEAD は動かない")
+        self.assertEqual(self.git("log", "--oneline", "-1", "--format=%s", cwd=wt).stdout.strip(), "e")
+        self.assertNotEqual(self.git("config", "--get", "user.evil", check=False).returncode, 0, "本物の config に書かれない")
+        self.assertEqual(self.git("log", "--oneline", "--format=%s", cwd=other).stdout.strip(), "evil", "一時 repo 側に commit が入る")
+        refs_after = self.git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/main",
+                              "refs/heads/nightly", "refs/remotes/origin/main", "refs/remotes/origin/nightly").stdout
+        refs_before = "\n".join(l for l in refs_before.splitlines() if "wip/env" not in l)
+        self.assertEqual(sorted(refs_after.split()), sorted(refs_before.split()), "trunk 側の ref は変わらない")
+
+    def test_gate_status_check_looks_at_the_branch_worktree_even_via_alias(self):
+        self.step("install")
+        wt = Path(self.tmp.name) / "wt-s"
+        self.git("worktree", "add", "-q", "-b", "wip/s", str(wt), "nightly")
+        (wt / "s.txt").write_text("s\n")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-q", "-m", "s", cwd=wt)
+        (self.work / "dirty-main.txt").write_text("x\n")
+        self.git("next", "--no-pr", cwd=wt)
+        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/s",
+                         "main worktree が dirty でも、枝の worktree が clean なら通る")
+
     # --- slug の解決 ---
 
     def test_slug_argument_finds_branch_from_elsewhere(self):
@@ -377,12 +415,26 @@ exit 1
         self.git("next")
         self.assertEqual(self.branch(), "wip/x")
 
-    def test_install_does_not_overwrite_foreign_hook(self):
+    def test_install_skips_foreign_hook_and_still_writes_aliases(self):
         hook = self.work / ".git/hooks/pre-push"
         hook.write_text("#!/bin/sh\nexit 0\n")
-        result = self.step("install", check=False)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(hook.read_text(), "#!/bin/sh\nexit 0\n")
+        result = self.step("install")
+        self.assertEqual(hook.read_text(), "#!/bin/sh\nexit 0\n", "上書きしない")
+        self.assertIn("repo", result.stderr, "案内を出す")
+        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+
+    def test_install_skips_repo_managed_hookspath(self):
+        (self.work / ".githooks").mkdir()
+        (self.work / ".githooks/pre-push").write_text("#!/bin/sh\nexit 0\n")
+        self.git("config", "core.hooksPath", ".githooks")
+        result = self.step("install")
+        self.assertEqual((self.work / ".githooks/pre-push").read_text(), "#!/bin/sh\nexit 0\n")
+        self.assertIn(".githooks", result.stderr)
+
+    def test_install_no_hook_writes_only_aliases(self):
+        self.step("install", "--no-hook")
+        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+        self.assertFalse((self.work / ".git/hooks/pre-push").exists())
 
     def test_pre_push_rejects_spike_and_allows_others(self):
         self.step("install")
