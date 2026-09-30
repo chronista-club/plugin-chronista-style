@@ -1,5 +1,5 @@
 """branch-step: git next / keep / drop と pre-push hook を一時 repo で検証する。
-Run with python3 -m unittest discover -s tests -v. gh は呼ばない（--dry-run）。"""
+Run with python3 -m unittest discover -s tests -v. gh は呼ばない（--print-pr）。"""
 import os
 from pathlib import Path
 import subprocess
