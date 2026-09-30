@@ -25,6 +25,7 @@ Claude Code / Codex で共通の `skills/` を使う。導入・更新・MCP 接
 | `chronista-style` | 入口 | North Star・設計哲学・基本姿勢・プロジェクト管理の規約。各スキルへ routing する |
 | `codeflow` | プロセス | Spark（想起）→ Conception（構想）→ GO で作業に切り替え、SDG で仕様・設計を記録する開発フロー |
 | `parallel-dev` | プロセス | 並列開発の道具選び。「隔離・出荷」2 層モデルで worktree / VP lane / stacked PR を判断 |
+| `branch-step` | プロセス | ブランチの段。`<段>/<slug>`（spike / wip / review）を `git next` / `keep` / `drop` で進める。spike はローカル専用 |
 | `spec-design-guide` | 文書 | spec（What & Why）・design（How）・guide（Usage）を `docs/` に書き、コードと同じ PR で育てる |
 | `tdd` | 規律 | テストファーストで実装する RED-GREEN-REFACTOR サイクル |
 | `systematic-debugging` | 規律 | 根本原因を特定してから修正する 4 ステップデバッグ |

@@ -8,6 +8,17 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-01
+
+### Added
+- `branch-step` `1.0.0`: ブランチ名は「今どの段にいるか」だけを語る。`<段>/<slug>`（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。`git next` / `keep` / `drop` / `board` で段を進め、`review/` に入る時だけ push + PR（base は trunk、body 冒頭に memory ID。`--print-pr` で gh を呼ばずコマンドだけ）。push が先、rename が後で、失敗しても local の名前は変わらない。門はその枝が checkout されている worktree で走る。`spike/*` はローカル専用で pre-push hook が push を拒否。`tests/test_branch_step.py` で一時 repo を使って検証。設計は `docs/design/02-branch-step-naming.md`（裁定は `mem_1CfZvzMGQyyyQJLqyZMyR8`）
+
+### Changed
+- `chronista-style` `6.1.2` → `6.1.3`: 「ブランチ運用（nightly trunk）」「Branch slug の規約」を `{type}/{slug}` から `<段>/<slug>` へ。type は commit message の仕事に。nightly 宛て PR は squash、`--delete-branch` → worktree を畳む → `git worktree prune` を規約本文に。marketplace の名前を `chronista-plugins` に更新
+- `parallel-dev` `0.2.2` → `0.2.3`: 枝の名前は隔離の道具に依らず `<段>/<slug>`。handoff は `wip/<slug>` を渡し、performer が `git next` で `review/` へ
+- `codeflow` `4.3.1` → `4.3.2`: Branch & PR の一行を `<段>/<slug>` に。操作は `branch-step` を指す
+- 検証環境を `.mise.toml` で宣言（python 3.12、`.venv` は mise が作る、`mise run check` = validate + test + lint + sync-check、`mise run package`）。導入ガイドの手動 venv 手順を置き換え
+
 ## [0.32.0] - 2026-09-06
 
 ### Added
