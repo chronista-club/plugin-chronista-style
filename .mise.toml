@@ -23,11 +23,23 @@ run = "python -m unittest discover -s tests -v"
 [tasks.lint]
 description = "シェルスクリプトの構文（hooks・bin・各スキルの scripts / hooks）"
 shell = "bash -c"
-run = "shopt -s nullglob; bash -n hooks/*.sh bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*"
+# bash -n は最初の引数しか検査しないので、1 ファイルずつ回す
+run = """
+shopt -s nullglob
+rc=0
+for f in hooks/*.sh bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*; do
+  bash -n "$f" || rc=1
+done
+exit $rc
+"""
+
+[tasks.sync-check]
+description = "Claude / Codex manifest の共有 metadata が一致しているか"
+run = "python scripts/sync-manifests.py --check"
 
 [tasks.check]
-description = "validate + test + lint（PR 前・branch-step の門に使う）"
-depends = ["validate", "test", "lint"]
+description = "validate + test + lint + sync-check（PR 前・branch-step の門に使う）"
+depends = ["validate", "test", "lint", "sync-check"]
 
 [tasks.package]
 description = "配布 ZIP を dist/ に作る"

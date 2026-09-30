@@ -91,13 +91,12 @@ creo-memories は別途接続する。プラグインのインストールだけ
 リポジトリのルートで実行する。
 
 ```bash
-mise trust && mise install        # 初回。python 3.12 と .venv を mise が用意する
-mise run check                    # validate + test + lint
+mise trust && mise install        # 初回。python 3.12 を入れる（.venv は最初の mise run で作られる）
+mise run check                    # validate + test + lint + sync-check
 mise run package                  # 配布 ZIP を dist/ に
-mise exec -- python scripts/sync-manifests.py --check
 ```
 
-検証環境の宣言は `.mise.toml`（python の版、`.venv` の作成、タスク）。Windows の Git Bash でも同じコマンドで動く。
+検証環境の宣言は `.mise.toml`（python の版、`.venv` の作成、タスク）。Windows の Git Bash は未検証。
 
 `dist/chronista-style.zip` に両 manifest と共有スキル・hooks をまとめる。ユーザー固有の `.mcp.json`、`.git/`、開発環境は含めない。ZIP はローカル導入用の配布物であり、公開カタログへの掲載は別手順。
 

@@ -9,7 +9,7 @@
 ## [Unreleased]
 
 ### Changed
-- 検証環境を `.mise.toml` で宣言（python 3.12、`.venv` は mise が作る、`mise run check` = validate + test + lint、`mise run package`）。導入ガイドの手動 venv 手順を置き換え
+- 検証環境を `.mise.toml` で宣言（python 3.12、`.venv` は mise が作る、`mise run check` = validate + test + lint + sync-check、`mise run package`）。導入ガイドの手動 venv 手順を置き換え
 
 ## [0.32.0] - 2026-09-06
 
