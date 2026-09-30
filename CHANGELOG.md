@@ -15,6 +15,7 @@
 - `chronista-style` `6.1.2` → `6.1.3`: 「ブランチ運用（nightly trunk）」「Branch slug の規約」を `{type}/{slug}` から `<段>/<slug>` へ。type は commit message の仕事に。nightly 宛て PR は squash、`--delete-branch` → worktree を畳む → `git worktree prune` を規約本文に。marketplace の名前を `chronista-plugins` に更新
 - `parallel-dev` `0.2.2` → `0.2.3`: 枝の名前は隔離の道具に依らず `<段>/<slug>`。handoff は `wip/<slug>` を渡し、performer が `git next` で `review/` へ
 - `codeflow` `4.3.1` → `4.3.2`: Branch & PR の一行を `<段>/<slug>` に。操作は `branch-step` を指す
+- 検証環境を `.mise.toml` で宣言（python 3.12、`.venv` は mise が作る、`mise run check` = validate + test + lint + sync-check、`mise run package`）。導入ガイドの手動 venv 手順を置き換え
 
 ## [0.32.0] - 2026-09-06
 
