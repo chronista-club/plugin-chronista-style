@@ -16,7 +16,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y jq
       - run: python scripts/validate.py
       - run: python -m unittest discover -s tests -v
-      - run: bash -n hooks/*.sh bin/setup bin/setup-windows
+      # bash -n は第 1 引数しか検査しない（残りは $1 $2 … として渡るだけ）ので、ファイルごとに回す
+      - run: |
+          shopt -s nullglob
+          rc=0
+          for f in hooks/*.sh bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*; do
+            bash -n "$f" || rc=1
+          done
+          exit $rc
       - run: python scripts/package.py
       - uses: actions/upload-artifact@v4
         with:
