@@ -91,19 +91,17 @@ creo-memories は別途接続する。プラグインのインストールだけ
 リポジトリのルートで実行する。
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python scripts/sync-manifests.py --check
-.venv/bin/python scripts/validate.py
-.venv/bin/python -m unittest discover -s tests -v
-.venv/bin/python scripts/package.py
+mise trust && mise install        # 初回。python 3.12 と .venv を mise が用意する
+mise run check                    # validate + test + lint
+mise run package                  # 配布 ZIP を dist/ に
+mise exec -- python scripts/sync-manifests.py --check
 ```
 
-Windows の Git Bash では `.venv/bin/python` を `.venv/Scripts/python.exe` に読み替える。
+検証環境の宣言は `.mise.toml`（python の版、`.venv` の作成、タスク）。Windows の Git Bash でも同じコマンドで動く。
 
 `dist/chronista-style.zip` に両 manifest と共有スキル・hooks をまとめる。ユーザー固有の `.mcp.json`、`.git/`、開発環境は含めない。ZIP はローカル導入用の配布物であり、公開カタログへの掲載は別手順。
 
-版の正本は `.claude-plugin/plugin.json`。版を変更したら `python3 scripts/sync-manifests.py` で Codex 側へ同期し、検証する。CI も同期・スキル・hooks を確認し ZIP を artifact として作成する。tag、GitHub Release、marketplace 公開は自動では行わない。
+版の正本は `.claude-plugin/plugin.json`。版を変更したら `mise exec -- python scripts/sync-manifests.py` で Codex 側へ同期し、検証する。CI も同期・スキル・hooks を確認し ZIP を artifact として作成する。tag、GitHub Release、marketplace 公開は自動では行わない。
 
 ## 実アプリでの確認
 

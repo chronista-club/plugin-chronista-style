@@ -1,0 +1,35 @@
+# 検証環境は mise で宣言する（グローバル mise はタスクランナー専用。ランタイムは repo ごとにここで）
+# 初回: mise trust && mise install
+[tools]
+python = "3.12"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.deps]
+description = "検証用の Python 依存（PyYAML）を入れる"
+run = "python -m pip install -q -r requirements-dev.txt"
+
+[tasks.validate]
+description = "manifest・スキル・hook パス・ローカル参照の整合性"
+depends = ["deps"]
+run = "python scripts/validate.py"
+
+[tasks.test]
+description = "hook と branch-step と配布の回帰テスト"
+depends = ["deps"]
+run = "python -m unittest discover -s tests -v"
+
+[tasks.lint]
+description = "シェルスクリプトの構文（hooks・bin・各スキルの scripts / hooks）"
+shell = "bash -c"
+run = "shopt -s nullglob; bash -n hooks/*.sh bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*"
+
+[tasks.check]
+description = "validate + test + lint（PR 前・branch-step の門に使う）"
+depends = ["validate", "test", "lint"]
+
+[tasks.package]
+description = "配布 ZIP を dist/ に作る"
+depends = ["validate"]
+run = "python scripts/package.py"
