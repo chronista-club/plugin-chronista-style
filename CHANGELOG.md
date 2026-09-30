@@ -9,7 +9,7 @@
 ## [Unreleased]
 
 ### Added
-- `branch-step` `1.0.0`: ブランチ名は「今どの段にいるか」だけを語る。`<段>/<slug>`（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。`git next` / `keep` / `drop` で段を進め、`review/` に入る時だけ push + PR（base は trunk、body 冒頭に memory ID）。`spike/*` はローカル専用で pre-push hook が push を拒否。`tests/test_branch_step.py` で一時 repo を使って検証。設計は `docs/design/02-branch-step-naming.md`（裁定は `mem_1CfZvzMGQyyyQJLqyZMyR8`）
+- `branch-step` `1.0.0`: ブランチ名は「今どの段にいるか」だけを語る。`<段>/<slug>`（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。`git next` / `keep` / `drop` / `board` で段を進め、`review/` に入る時だけ push + PR（base は trunk、body 冒頭に memory ID。`--print-pr` で gh を呼ばずコマンドだけ）。push が先、rename が後で、失敗しても local の名前は変わらない。門はその枝が checkout されている worktree で走る。`spike/*` はローカル専用で pre-push hook が push を拒否。`tests/test_branch_step.py` で一時 repo を使って検証。設計は `docs/design/02-branch-step-naming.md`（裁定は `mem_1CfZvzMGQyyyQJLqyZMyR8`）
 
 ### Changed
 - `chronista-style` `6.1.2` → `6.1.3`: 「ブランチ運用（nightly trunk）」「Branch slug の規約」を `{type}/{slug}` から `<段>/<slug>` へ。type は commit message の仕事に。marketplace の名前を `chronista-plugins` に更新

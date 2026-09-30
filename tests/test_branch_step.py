@@ -16,7 +16,7 @@ class BranchStepTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         base = Path(self.tmp.name)
         self.env = {
-            **os.environ,
+            **{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
             "HOME": str(base / "home"),
             "GIT_CONFIG_GLOBAL": str(base / "home/.gitconfig"),
             "GIT_CONFIG_NOSYSTEM": "1",
@@ -71,7 +71,7 @@ class BranchStepTest(unittest.TestCase):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
         self.git("remote", "set-url", "origin", str(Path(self.tmp.name) / "missing.git"))
-        result = self.step("next", "--memory", "mem_T", "--dry-run", check=False)
+        result = self.step("next", "--memory", "mem_T", "--print-pr", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.branch(), "wip/x", "push に失敗したら rename しない")
 
@@ -96,7 +96,7 @@ class BranchStepTest(unittest.TestCase):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
         self.git("push", "-q", "-u", "origin", "wip/x")
-        result = self.step("next", "--memory", "mem_TEST123", "--dry-run")
+        result = self.step("next", "--memory", "mem_TEST123", "--print-pr")
         self.assertEqual(self.branch(), "review/x")
         self.assertIn("review/x", self.remote_branches())
         self.assertNotIn("wip/x", self.remote_branches(), "wip の backup push は消す")
@@ -111,13 +111,13 @@ class BranchStepTest(unittest.TestCase):
         self.git("push", "-q", "origin", "--delete", "nightly")
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
-        result = self.step("next", "--memory", "mem_T", "--dry-run")
+        result = self.step("next", "--memory", "mem_T", "--print-pr")
         self.assertIn("--base main", result.stdout)
 
     def test_next_to_review_requires_memory_unless_no_pr(self):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
-        result = self.step("next", "--dry-run", check=False)
+        result = self.step("next", "--print-pr", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.branch(), "wip/x", "門で止まったら rename しない")
         self.assertNotIn("review/x", self.remote_branches())
@@ -137,11 +137,11 @@ class BranchStepTest(unittest.TestCase):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
         self.git("config", "branch-step.test", "false")
-        result = self.step("next", "--memory", "mem_T", "--dry-run", check=False)
+        result = self.step("next", "--memory", "mem_T", "--print-pr", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.branch(), "wip/x")
         self.git("config", "branch-step.test", "true")
-        self.step("next", "--memory", "mem_T", "--dry-run")
+        self.step("next", "--memory", "mem_T", "--print-pr")
         self.assertEqual(self.branch(), "review/x")
 
     def test_next_gate_warns_when_code_changed_without_design(self):
@@ -150,14 +150,101 @@ class BranchStepTest(unittest.TestCase):
         self.git("push", "-q", "origin", "nightly")
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("code", "src/a.rs")
-        result = self.step("next", "--memory", "mem_T", "--dry-run")
+        result = self.step("next", "--memory", "mem_T", "--print-pr")
         self.assertIn("design", result.stderr)
         self.assertEqual(self.branch(), "review/x", "警告だけで止めない")
         self.git("checkout", "-q", "-b", "wip/y", "nightly")
         self.commit("code2", "src/b.rs")
         self.commit("design2", "docs/design/02-b.md")
-        result = self.step("next", "--memory", "mem_T", "--dry-run")
+        result = self.step("next", "--memory", "mem_T", "--print-pr")
         self.assertNotIn("design", result.stderr)
+
+    def test_gate_runs_in_the_worktree_of_the_branch(self):
+        self.git("checkout", "-q", "-b", "wip/g")
+        self.commit("FAIL", "FAIL")
+        self.git("checkout", "-q", "nightly")
+        self.git("config", "branch-step.test", "test ! -e FAIL")
+        result = self.step("next", "g", "--no-pr", check=False)
+        self.assertNotEqual(result.returncode, 0, "どこにも checkout されていない枝の門は走れない")
+        self.assertIn("wip/g", self.local_branches())
+        wt = Path(self.tmp.name) / "wt-g"
+        self.git("worktree", "add", "-q", str(wt), "wip/g")
+        result = self.step("next", "g", "--no-pr", check=False)
+        self.assertNotEqual(result.returncode, 0, "枝の worktree に FAIL があるので門で止まる")
+        self.assertIn("wip/g", self.local_branches())
+        (wt / "FAIL").unlink()
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-q", "-m", "fix", cwd=wt)
+        self.step("next", "g", "--no-pr")
+        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/g")
+
+    def test_trunk_is_nightly_when_only_remote_has_it(self):
+        clone = Path(self.tmp.name) / "clone"
+        self.git("clone", "-q", str(self.origin), str(clone), cwd=Path(self.tmp.name))
+        self.assertNotIn("nightly", self.git("for-each-ref", "--format=%(refname:short)", "refs/heads", cwd=clone).stdout)
+        self.git("switch", "-q", "-c", "wip/f", "origin/nightly", cwd=clone)
+        (clone / "f.txt").write_text("f\n")
+        self.git("add", "-A", cwd=clone)
+        self.git("commit", "-q", "-m", "f", cwd=clone)
+        result = subprocess.run(["bash", str(SCRIPT), "next", "--memory", "mem_T", "--print-pr"],
+                                cwd=clone, env=self.env, text=True, capture_output=True, check=True)
+        self.assertIn("--base nightly", result.stdout)
+
+    def test_next_exp_to_wip_pushes_wip_and_sets_upstream(self):
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        self.step("keep")
+        self.step("next")
+        self.assertEqual(self.branch(), "wip/x")
+        self.assertIn("wip/x", self.remote_branches())
+        self.assertNotIn("exp/x", self.remote_branches())
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}").stdout.strip(), "origin/wip/x")
+
+    def test_print_pr_has_no_side_effects_beyond_push_and_rename(self):
+        self.git("checkout", "-q", "-b", "wip/x")
+        self.commit("a")
+        result = self.step("next", "--memory", "mem_T", "--print-pr")
+        self.assertIn("gh pr create", result.stdout)
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}").stdout.strip(), "origin/review/x")
+
+    def test_next_to_review_checks_gh_before_pushing(self):
+        self.git("checkout", "-q", "-b", "wip/x")
+        self.commit("a")
+        env = {**self.env, "PATH": "/usr/bin:/bin"}
+        result = subprocess.run(["bash", str(SCRIPT), "next", "--memory", "mem_T"], cwd=self.work,
+                                env=env, text=True, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("gh", result.stderr)
+        self.assertEqual(self.branch(), "wip/x")
+        self.assertNotIn("review/x", self.remote_branches(), "gh が無いなら push もしない")
+
+    def test_keep_push_failure_restores_spike(self):
+        self.git("checkout", "-q", "-b", "spike/k")
+        self.commit("a")
+        self.git("remote", "set-url", "origin", str(Path(self.tmp.name) / "missing.git"))
+        result = self.step("keep", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.branch(), "spike/k", "push に失敗したら spike/ に戻す")
+
+    def test_drop_works_inside_a_linked_worktree(self):
+        wt = Path(self.tmp.name) / "wt-w"
+        self.git("worktree", "add", "-q", "-b", "spike/w", str(wt), "nightly")
+        (wt / "w.txt").write_text("w\n")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-q", "-m", "w", cwd=wt)
+        result = subprocess.run(["bash", str(SCRIPT), "drop"], cwd=wt, env=self.env,
+                                text=True, capture_output=True, check=True)
+        self.assertNotIn("spike/w", self.local_branches())
+        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "", "worktree は detached で残る")
+        self.assertIn("worktree remove", result.stderr)
+
+    def test_missing_option_value_is_a_clean_error(self):
+        self.git("checkout", "-q", "-b", "wip/x")
+        self.commit("a")
+        result = self.step("next", "--memory", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("未割り当て", result.stderr)
+        self.assertNotIn("unbound", result.stderr)
 
     # --- slug の解決 ---
 
@@ -202,6 +289,7 @@ class BranchStepTest(unittest.TestCase):
     def test_install_sets_aliases_and_hook(self):
         self.step("install")
         self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+        self.assertIn("board", self.git("config", "--get", "alias.board").stdout)
         hook = self.work / ".git/hooks/pre-push"
         self.assertTrue(os.access(hook, os.X_OK))
         self.git("checkout", "-q", "-b", "spike/x")
@@ -224,8 +312,10 @@ class BranchStepTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("spike", result.stderr)
         self.assertNotIn("spike/x", self.remote_branches())
-        result = self.git("push", "origin", "spike/x:refs/heads/wip/x", check=False)
-        self.assertNotEqual(result.returncode, 0, "spike を別名で押すのも拒否")
+        for src in ("spike/x", "HEAD", "@"):
+            result = self.git("push", "origin", f"{src}:refs/heads/wip/x", check=False)
+            self.assertNotEqual(result.returncode, 0, f"spike を別名で押すのも拒否 ({src})")
+        self.assertNotIn("wip/x", self.remote_branches())
         self.git("checkout", "-q", "-b", "wip/y")
         self.git("push", "-q", "origin", "wip/y")
         self.assertIn("wip/y", self.remote_branches())

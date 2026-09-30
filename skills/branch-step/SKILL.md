@@ -34,37 +34,40 @@ slug は起票 memory の Branch slug と同じ（`[a-z0-9-]+`）。worktree の
 ## 操作は三つ
 
 ```bash
-git next [<slug>] [--memory mem_xxx] [--title "…"] [--no-pr] [--dry-run]
+git next [<slug>] [--memory mem_xxx] [--title "…"] [--no-pr] [--print-pr]
 git keep [<slug>]
 git drop [<slug>]
+git board
 ```
 
 - **`git next` = 昇格**。`spike/` → `wip/`、`exp/` → `wip/`（どちらも GO の瞬間）、`wip/` → `review/`。
-  review に入る時だけ **push して PR を開く**（base は trunk = `nightly`、無ければ `main`。body 冒頭に `--memory` の ID）。
-  `wip/` の backup push があれば消して `review/` で押し直す。`review/` から先は rename しない — 直しは PR の中で回す
-- **`git keep`**: `spike/` → `exp/`。ここで初めて外に出る（初 push）
+  review に入る時だけ **push して PR を開く**（base は trunk = `nightly`。local に無くても origin にあれば nightly、どちらにも無ければ `main`。body 冒頭に `--memory` の ID）。
+  順序は **push が先、rename が後**。push が失敗しても local の名前は変わらない。`wip/` の backup push があれば消して `review/` で押し直す。`review/` から先は rename しない — 直しは PR の中で回す。
+  `--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。本物の dry-run ではない）
+- **`git keep`**: `spike/` → `exp/`。ここで初めて外に出る（初 push。失敗したら `spike/` に名前を戻す）
 - **`git drop`**: `spike/` を削除。無言でよい。`wip/` 以降は消さない
-- slug を省くと今いる枝。trunk 上や別の枝からは slug を指定する
+- slug を省くと今いる枝。trunk 上や別の枝からは slug を指定する。`git drop` を linked worktree の中で使うと、その worktree は detached になる（あとで `git worktree remove`）
 
 ### wip → review の門
 
-- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す
+- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていなければ止まる
+- PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
 - trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じ枝」はここで思い出す
 
 ## 導入
 
 ```bash
 # 一度だけ（global alias）。--local なら今の repo だけ
-bash "$CLAUDE_PLUGIN_ROOT/skills/branch-step/scripts/branch-step" install
+bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install
 ```
 
-- `git next` / `keep` / `drop` の alias を書く
-- 今いる repo の `.git/hooks/pre-push` に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（別名で押すのも、削除は通す）。別の pre-push が既にあれば上書きせず止まる。repo ごとに一度 `install` を走らせる
+- `git next` / `keep` / `drop` / `board` の alias を書く。alias は script の絶対パス（plugin の版ごとのディレクトリ）を指すので、**plugin を更新したら `install` をやり直す**
+- 今いる repo の `.git/hooks/pre-push` に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように ref 名を経由しない push は止められない（仕様）。別の pre-push が既にあれば上書きせず止まる。repo ごとに一度 `install` を走らせる
 
 ## 一覧が board
 
 ```bash
-branch-step board
+git board
 ```
 
 `git for-each-ref` を段の列で並べるだけ。`origin/review/*` = レビュー担当の受信箱、`wip/*` で committerdate が古いもの = 停滞、`spike/*` は月次で気兼ねなく `git branch --list 'spike/*' | xargs git branch -D`（`exp/*` は対象外）。VP はこの一覧を描くだけ。
@@ -77,4 +80,4 @@ branch-step board
 
 ## 言語について
 
-bash で書いた（style の既定は Ruby）。git subcommand と pre-push hook は runtime 依存を持ち込まないことが要件で、CI も `bash -n` を既に回している。
+bash で書いた（style の既定は Ruby）。git subcommand と pre-push hook は runtime 依存を持ち込まないことが要件。構文は `tests/test_branch_step.py` の `test_scripts_parse` が見る。
