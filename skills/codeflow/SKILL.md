@@ -3,7 +3,7 @@ name: codeflow
 description: Spark（想起）から Conception（構想）を経て GO で作業に切り替え、SDG で仕様・設計を記録する開発フロー
 metadata:
   tags: "development, workflow, sdg, spark, conception, second-opinion"
-  version: "4.3.1"
+  version: "4.3.2"
 ---
 
 # Code Flow Skill
@@ -64,7 +64,7 @@ spec / design を Draft で `docs/` に置く（何を書くか・どう生か�
 
 ### Branch & PR（ブランチ & PR フロー）
 
-trunk は `nightly`、ブランチ名は `{type}/{slug}`、PR body 冒頭に memory ID。規約の本体は `chronista-style` ルートの「ブランチ運用（nightly trunk）」と「Branch slug の規約」。PR を出す前に `verification` を通す（設計に触れた変更なら design が同じ PR にあること、もそこで確かめる）。レビューで GO が出るまでマージしない。
+trunk は `nightly`、ブランチ名は `<段>/<slug>`（`spike/` → `wip/` → `review/`、段は `git next` で進める）、PR body 冒頭に memory ID。規約の本体は `chronista-style` ルートの「ブランチ運用（nightly trunk）」と「Branch slug の規約」、操作は `branch-step`。PR を出す前に `verification` を通す（設計に触れた変更なら design が同じ PR にあること、もそこで確かめる）。レビューで GO が出るまでマージしない。
 
 ### Implementation（実装・TDD）
 

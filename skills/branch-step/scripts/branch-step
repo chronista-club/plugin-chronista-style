@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# branch-step — ブランチ名は「今どの段にいるか」だけを語る。
+# 段 = prefix（spike / exp / wip / review）、slug は不変。段が進んだら rename する。
+# bash なのは、git subcommand と pre-push hook に runtime 依存を持ち込まないため。
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_SRC="$HERE/../hooks/pre-push"
+
+usage() {
+  cat <<'EOF'
+branch-step — 段 = prefix、slug は不変
+
+  git next [<slug>] [--memory <id>] [--title <t>] [--no-pr] [--print-pr]
+      昇格: spike→wip、exp→wip、wip→review。review に入る時だけ push + PR（base は trunk）
+      --print-pr は gh を呼ばずコマンドを印字する（push と rename は行う）
+  git keep [<slug>]      spike→exp（rename + 初 push）。育てる
+  git drop [<slug>]      spike を削除。無言でよい
+  git board              段ごとの ref 一覧（committerdate 順）
+  branch-step install [--local|--global]
+      git alias（next / keep / drop / board。既定は今の repo だけ）と、この repo の pre-push hook を入れる
+EOF
+}
+
+die() { echo "branch-step: $*" >&2; exit 1; }
+note() { echo "branch-step: $*" >&2; }
+
+# trunk の名前。local に無くても origin にあれば nightly（clone 直後の事故を防ぐ）
+trunk() {
+  if git show-ref --verify --quiet refs/heads/nightly \
+     || git show-ref --verify --quiet refs/remotes/origin/nightly; then
+    echo nightly
+  else
+    echo main
+  fi
+}
+
+# 比較に使う trunk の ref。origin 側を優先する
+trunk_ref() {
+  local t; t="$(trunk)"
+  if git show-ref --verify --quiet "refs/remotes/origin/$t"; then echo "origin/$t"; else echo "$t"; fi
+}
+
+remote_has() { git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
+
+# 枝が checkout されている worktree のパス（無ければ空）
+worktree_of() {
+  git worktree list --porcelain | awk -v ref="refs/heads/$1" '
+    /^worktree /{wt=substr($0, 10)} /^branch /{if ($2 == ref) print wt}'
+}
+
+# slug は [a-z0-9-]+ だけ。stack 形（<段>/<epic>/<part>）は未決なので拒否する
+check_slug() {
+  [[ "$1" =~ ^[a-z0-9-]+$ ]] || die "slug '$1' は英小文字・数字・ハイフンだけ（stack 形の枝は未決なので扱わない）"
+}
+
+# slug から今の枝を一つに決める。引数無しなら今いる枝。glob は使わず完全一致
+resolve() {
+  local slug="${1:-}" current stage matches=""
+  if [ -z "$slug" ]; then
+    current="$(git branch --show-current)"
+    case "$current" in
+      spike/*|exp/*|wip/*|review/*|hotfix/*) check_slug "${current#*/}"; echo "$current"; return ;;
+      "") die "detached HEAD。slug を指定してください" ;;
+      *) die "今の枝 '$current' は段の列ではありません。slug を指定してください" ;;
+    esac
+  fi
+  check_slug "$slug"
+  for stage in spike exp wip review hotfix; do
+    git show-ref --verify --quiet "refs/heads/$stage/$slug" && matches="$matches$stage/$slug"$'\n'
+  done
+  [ -n "$matches" ] || die "slug '$slug' の枝がありません"
+  [ "$(printf '%s' "$matches" | wc -l)" -eq 1 ] || die "slug '$slug' が複数の段にあります:"$'\n'"$matches"
+  printf '%s' "$matches"
+}
+
+rename() {
+  git branch -m "$1" "$2"
+  note "$1 -> $2"
+}
+
+# push が先、rename は後。push が失敗しても local の名前は変わらない
+push_then_rename() {
+  local branch="$1" target="$2"
+  git push --quiet origin "refs/heads/$branch:refs/heads/$target"
+  note "origin/$target へ push"
+  rename "$branch" "$target"
+  git branch --quiet --set-upstream-to "origin/$target" "$target"
+  if remote_has "$branch"; then
+    git push --quiet origin --delete "$branch"
+    note "origin/$branch を削除（$target で押し直した）"
+  fi
+}
+
+# wip → review の門。枝が checkout されている worktree の中で見る
+gate() {
+  local branch="$1" wt test_cmd base changed non_docs design
+  wt="$(worktree_of "$branch")"
+  [ -n "$wt" ] || die "$branch はどの worktree にも checkout されていません。checkout してから（門はその作業ツリーで走る）"
+  [ -z "$(git -C "$wt" status --porcelain)" ] || die "$wt に未 commit の変更があります。commit してから（門は commit 済みの状態を見る。push されるのもそれ）"
+  test_cmd="$(git config --get branch-step.test || true)"
+  if [ -n "$test_cmd" ]; then
+    note "門: テスト ($test_cmd) @ $wt"
+    (cd "$wt" && bash -c "$test_cmd") || die "テストが green ではないので review に進めません"
+  else
+    note "門: テストコマンド未設定（git config branch-step.test '<cmd>' で有効化）"
+  fi
+  base="$(git merge-base "$(trunk_ref)" "$branch")"
+  changed="$(git diff --name-only "$base" "$branch")"
+  non_docs="$(printf '%s\n' "$changed" | grep -v '^docs/' | grep . || true)"
+  design="$(printf '%s\n' "$changed" | grep '^docs/design/' || true)"
+  if [ -n "$non_docs" ] && [ -z "$design" ] && [ -d "$wt/docs/design" ]; then
+    note "警告: docs/ 以外に変更があるのに docs/design/ に変更がありません。設計に触れたなら design を同じ枝に"
+  fi
+}
+
+need_value() { [ $# -ge 2 ] && [ -n "$2" ] || die "$1 には値が要ります"; }
+
+require_gh() {
+  command -v gh >/dev/null || die "gh がありません。入れるか、--print-pr でコマンドだけ出す"
+  gh auth status >/dev/null 2>&1 || die "gh が未認証です（gh auth login）。または --print-pr"
+}
+
+has_pr() { gh pr view "$1" >/dev/null 2>&1; }
+
+# review/ の枝に PR を開く。失敗しても枝はそのまま。次の git next で PR 作成だけやり直せる
+open_pr() {
+  local target="$1" memory="$2" title="$3" print_pr="$4" body
+  [ -n "$title" ] || title="$(git log -1 --format=%s "$target")"
+  body="$memory"$'\n\n'"$(git log --reverse --format='- %s' "$(trunk_ref)..$target")"
+  local -a pr_cmd=(gh pr create --base "$(trunk)" --head "$target" --title "$title" --body "$body")
+  if [ "$print_pr" -eq 1 ]; then
+    printf 'print-pr:'; printf ' %q' "${pr_cmd[@]}"; printf '\n'
+  else
+    "${pr_cmd[@]}" || die "PR 作成に失敗。枝は $target のまま。git next で PR 作成だけやり直せる。手で打つなら: $(printf '%q ' "${pr_cmd[@]}")"
+  fi
+}
+
+cmd_next() {
+  local slug="" memory="" title="" no_pr=0 print_pr=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --memory) need_value "$@"; memory="$2"; shift 2 ;;
+      --title) need_value "$@"; title="$2"; shift 2 ;;
+      --no-pr) no_pr=1; shift ;;
+      --print-pr) print_pr=1; shift ;;
+      -*) die "不明なオプション: $1" ;;
+      *) slug="$1"; shift ;;
+    esac
+  done
+  local branch stage name target
+  branch="$(resolve "$slug")"
+  stage="${branch%%/*}"; name="${branch#*/}"
+  case "$stage" in
+    spike)
+      rename "$branch" "wip/$name"
+      ;;
+    exp)
+      push_then_rename "$branch" "wip/$name"
+      ;;
+    wip)
+      target="review/$name"
+      if [ "$no_pr" -eq 0 ]; then
+        [ -n "$memory" ] || die "review に入るには PR body 冒頭の memory ID が要ります: --memory mem_xxx（PR を開かないなら --no-pr）"
+        [ "$print_pr" -eq 1 ] || require_gh
+      fi
+      gate "$branch"
+      push_then_rename "$branch" "$target"
+      [ "$no_pr" -eq 1 ] || open_pr "$target" "$memory" "$title" "$print_pr"
+      ;;
+    review)
+      # PR が既にあれば語り手は PR。無ければ（前回 gh pr create が失敗した等）PR 作成だけやり直す
+      [ "$print_pr" -eq 1 ] || require_gh
+      if [ "$print_pr" -eq 0 ] && has_pr "$branch"; then
+        die "$branch は PR が語り手です。直しは PR の中で回す（rename しない）"
+      fi
+      [ -n "$memory" ] || die "$branch に PR がありません。PR body 冒頭の memory ID を付けて開く: git next --memory mem_xxx"
+      open_pr "$branch" "$memory" "$title" "$print_pr"
+      ;;
+    hotfix) die "$branch は main 起点の一列です。段は無いので main へ PR を" ;;
+  esac
+}
+
+cmd_keep() {
+  local branch target
+  branch="$(resolve "${1:-}")"
+  [ "${branch%%/*}" = spike ] || die "keep は spike/ だけ（$branch）"
+  target="exp/${branch#*/}"
+  # spike の ref は hook が拒否するので rename が先。push に失敗したら名前を戻す
+  rename "$branch" "$target"
+  if ! git push --quiet -u origin "$target"; then
+    git branch -m "$target" "$branch"
+    die "push に失敗したので $branch に戻しました"
+  fi
+  note "origin/$target へ初 push（exp/ は掃除の対象外。閉じるのは本人だけ）"
+}
+
+cmd_drop() {
+  local branch
+  branch="$(resolve "${1:-}")"
+  [ "${branch%%/*}" = spike ] || die "drop は spike/ だけ（$branch）。wip 以降は PR か本人の判断で"
+  if [ "$(git branch --show-current)" = "$branch" ]; then
+    [ -z "$(git status --porcelain)" ] || die "未 commit の変更があります。捨てるなら git stash か checkout .、残すなら commit して git keep"
+    if ! git checkout --quiet "$(trunk)" 2>/dev/null; then
+      git checkout --quiet --detach "$(trunk_ref)"
+      note "trunk は別の worktree が使っているので detached にしました。用済みなら: git worktree remove $(pwd)"
+    fi
+  fi
+  git branch -D "$branch" >/dev/null
+  note "$branch を削除"
+}
+
+cmd_board() {
+  git for-each-ref --sort=-committerdate \
+    --format='%(refname:short)  %(committerdate:relative)' \
+    refs/heads/spike refs/heads/exp refs/heads/wip refs/heads/review refs/heads/hotfix \
+    refs/remotes/origin/review refs/remotes/origin/wip refs/remotes/origin/exp
+}
+
+cmd_install() {
+  local scope="--local" self hooks_dir hook
+  case "${1:-}" in
+    ""|--local) ;;
+    --global) scope="--global" ;;
+    *) die "install の引数は --local（既定）か --global だけ: $1" ;;
+  esac
+  self="$HERE/branch-step"
+  for name in next keep drop board; do
+    git config "$scope" "alias.$name" "!\"$self\" $name"
+  done
+  note "git alias ($scope): next / keep / drop / board -> $self"
+  note "  このパスは plugin の版に紐づく。plugin を更新したら install をやり直す（--global なら全 repo に効く）"
+  hooks_dir="$(git rev-parse --git-path hooks)"
+  hook="$hooks_dir/pre-push"
+  if [ -e "$hook" ] && ! grep -q '^# branch-step pre-push' "$hook"; then
+    die "$hook は別の hook です。上書きしません。中身を統合するか、core.hooksPath で分けてください"
+  fi
+  mkdir -p "$hooks_dir"
+  cp "$HOOK_SRC" "$hook" && chmod +x "$hook"
+  note "pre-push hook: $hook（spike/* の push を拒否）"
+}
+
+case "${1:-}" in
+  next) shift; cmd_next "$@" ;;
+  keep) shift; cmd_keep "$@" ;;
+  drop) shift; cmd_drop "$@" ;;
+  board) shift; cmd_board "$@" ;;
+  install) shift; cmd_install "$@" ;;
+  ""|-h|--help) usage ;;
+  *) die "不明なコマンド: $1（next / keep / drop / board / install）" ;;
+esac
