@@ -2,7 +2,7 @@
 name: chronista-style
 description: Chronista として活動するスキルセットの入口。North Star・設計哲学・基本姿勢・プロジェクト管理の規約を定義し、各スキルへ routing する。
 metadata:
-  version: "6.1.2"
+  version: "6.1.3"
   tags: "chronista, development, workflow, memory"
 ---
 
@@ -21,6 +21,7 @@ chronista-style (このスキル)
 ├── creo-memories        【最優先】永続記憶
 ├── codeflow             開発フロー（Spark → Conception → GO → …）
 ├── parallel-dev         並列開発の道具選び（隔離・出荷の 2 層）
+├── branch-step          ブランチの段（spike / wip / review）と git next / keep / drop
 ├── spec-design-guide    spec / design / guide と Living Documentation
 ├── tdd                  テスト駆動開発【規律】
 ├── systematic-debugging 体系的デバッグ【規律】
@@ -177,17 +178,18 @@ Context Engine の記憶コンテキストが実際に届いていれば活用�
 開発 trunk は **`nightly`**。`main` は**リリース済みの状態**のみを指す。
 
 ```
-feature ──PR(squash)──> nightly ──version bump──> main ──tag──> リリース
+memory ─思いつき─▶ spike/x ─GO─▶ wip/x ─検証 green─▶ review/x ─approve─▶ nightly ─release─▶ main ─tag─▶ vX.Y.Z
 ```
 
-- 日々の PR は **nightly 宛て**に積む: `gh pr create --base nightly`
-- リリース時に version bump して **nightly → main をマージ**し、main で tag を打つ
-- nightly → main は **merge commit**（squash すると履歴が発散し、次回リリースで全面コンフリクトする）
+- 枝の名前は **`<段>/<slug>`**。段 = prefix（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。段が進んだら rename する（`git next`）。段の意味と操作の本体は `branch-step`
+- 日々の PR は **nightly 宛て**。`git next` が `review/` に入る時に `--base nightly` で開く。手で開くなら `gh pr create --base nightly`
+- リリースは `release` スキル。nightly → main は **merge commit**（squash すると履歴が発散し、次回リリースで全面コンフリクトする）、main で tag
+- `hotfix/<slug>` だけ main 起点。main へ PR、tag、main を nightly へ back-merge
 
 **GitHub のデフォルトブランチは `main` のまま**にすること。プラグイン marketplace
-（`chronista-club/claude-plugins`）の source 定義に ref 指定が無く、**デフォルト
-ブランチがそのまま配布元になる**ため。nightly をデフォルトにすると未リリース版が
-配布される。その代わり PR のベース指定漏れに注意（`--base nightly` を必ず付ける）。
+（`chronista-club/chronista-plugins`）は `main` を配布元にしているため、nightly を
+デフォルトにすると未リリース版が配布される。その代わり PR のベース指定漏れに注意
+（`git next` を使えば付け忘れない）。
 
 ### Issue-first の原則（ガイドライン）
 
@@ -203,7 +205,7 @@ memory を todo に（creo-memories、category: todo）
     └─ AI の理解（理解が変わるたびに更新。裁定の原文は不変、理解はその上に積む）
     └─ ## Meta / Branch slug を記載
     ↓
-Branch（{type}/{slug} 形式、英字 kebab-case）
+Branch（`spike/<slug>` で探るか `wip/<slug>` で作る。段は `branch-step`）
     ↓
 実装
     ↓
@@ -216,7 +218,7 @@ PR（nightly 宛て、body 冒頭に memory ID）
 
 #### Branch slug の規約
 
-ブランチ名は `{type}/{slug}` 形式（`fix/plugin-spec-compliance` 等）。type は conventional commits に揃える（feat / fix / docs / refactor / chore）。
+ブランチ名は `<段>/<slug>`（`wip/plugin-spec-compliance` 等）。名前に載るのは**今いる段**だけで、type（feat / fix / docs …）は commit message の仕事。slug は起票 memory と同じで、生まれてから出荷まで不変。worktree のディレクトリ名も slug。
 
 memory のタイトルは日本語混じり・長大になりがちで、そのままブランチ名にすると GitHub 側で non-ASCII branch name の warning が出るし、CLI で扱いにくい。
 

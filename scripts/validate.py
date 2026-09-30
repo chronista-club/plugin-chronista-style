@@ -22,7 +22,7 @@ def validate(root):
     for manifest in manifests:
         assert not manifest.get("mcpServers"), "Personal MCP config must not be bundled"
     skills = sorted((root / "skills").glob("*/SKILL.md"))
-    assert len(skills) == 11, "Expected 11 shared skills"
+    assert len(skills) == 12, "Expected 12 shared skills"
     for path in skills:
         parts = path.read_text().split("---", 2)
         assert len(parts) == 3 and not parts[0], f"Missing frontmatter: {path}"
@@ -51,4 +51,4 @@ def validate(root):
 
 if __name__ == "__main__":
     validate(ROOT)
-    print("Manifests, 11 skills, hook paths and local references validated.")
+    print("Manifests, 12 skills, hook paths and local references validated.")

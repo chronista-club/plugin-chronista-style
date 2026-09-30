@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# branch-step — ブランチ名は「今どの段にいるか」だけを語る。
+#   段 = prefix（spike / exp / wip / review）、slug は不変。段が進んだら rename する。
+#
+#   git next [<slug>] [--memory <id>] [--title <t>] [--no-pr] [--dry-run]
+#       昇格: spike→wip、exp→wip、wip→review。review に入る時だけ push + PR（base は trunk）
+#   git keep [<slug>]      spike→exp（rename + 初 push）。育てる
+#   git drop [<slug>]      spike を削除。無言でよい
+#   branch-step board      段ごとの ref 一覧（committerdate 順）
+#   branch-step install [--local]
+#       git alias（next / keep / drop）と、この repo の pre-push hook を入れる
+#
+# bash なのは、git subcommand と pre-push hook に runtime 依存を持ち込まないため。
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_SRC="$HERE/../hooks/pre-push"
+
+die() { echo "branch-step: $*" >&2; exit 1; }
+note() { echo "branch-step: $*" >&2; }
+
+trunk() {
+  if git show-ref --verify --quiet refs/heads/nightly; then echo nightly; else echo main; fi
+}
+
+remote_has() { git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
+
+# slug から今の枝を一つに決める。引数無しなら今いる枝
+resolve() {
+  local slug="${1:-}" current matches
+  if [ -z "$slug" ]; then
+    current="$(git branch --show-current)"
+    case "$current" in
+      spike/*|exp/*|wip/*|review/*|hotfix/*) echo "$current"; return ;;
+      "") die "detached HEAD。slug を指定してください" ;;
+      *) die "今の枝 '$current' は段の列ではありません。slug を指定してください" ;;
+    esac
+  fi
+  matches="$(git for-each-ref --format='%(refname:short)' \
+    "refs/heads/spike/$slug" "refs/heads/exp/$slug" "refs/heads/wip/$slug" \
+    "refs/heads/review/$slug" "refs/heads/hotfix/$slug")"
+  [ -n "$matches" ] || die "slug '$slug' の枝がありません"
+  [ "$(printf '%s\n' "$matches" | wc -l)" -eq 1 ] || die "slug '$slug' が複数の段にあります:"$'\n'"$matches"
+  echo "$matches"
+}
+
+rename() {
+  git branch -m "$1" "$2"
+  note "$1 -> $2"
+}
+
+# wip → review の門
+gate() {
+  local branch="$1" base test_cmd changed
+  test_cmd="$(git config --get branch-step.test || true)"
+  if [ -n "$test_cmd" ]; then
+    note "門: テスト ($test_cmd)"
+    bash -c "$test_cmd" || die "テストが green ではないので review に進めません"
+  else
+    note "門: テストコマンド未設定（git config branch-step.test '<cmd>' で有効化）"
+  fi
+  base="$(git merge-base "$(trunk)" "$branch")"
+  changed="$(git diff --name-only "$base" "$branch")"
+  if [ -n "$changed" ] && [ -d docs/design ] \
+     && printf '%s\n' "$changed" | grep -qv '^docs/' \
+     && ! printf '%s\n' "$changed" | grep -q '^docs/design/'; then
+    note "警告: docs/ 以外に変更があるのに docs/design/ に変更がありません。設計に触れたなら design を同じ枝に"
+  fi
+}
+
+cmd_next() {
+  local slug="" memory="" title="" no_pr=0 dry_run=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --memory) memory="$2"; shift 2 ;;
+      --title) title="$2"; shift 2 ;;
+      --no-pr) no_pr=1; shift ;;
+      --dry-run) dry_run=1; shift ;;
+      -*) die "不明なオプション: $1" ;;
+      *) slug="$1"; shift ;;
+    esac
+  done
+  local branch stage name target
+  branch="$(resolve "$slug")"
+  stage="${branch%%/*}"; name="${branch#*/}"
+  case "$stage" in
+    spike|exp)
+      target="wip/$name"
+      rename "$branch" "$target"
+      if [ "$stage" = exp ] && remote_has "$branch"; then
+        git push --quiet origin --delete "$branch"
+        note "origin/$branch を削除（昇格したので wip/ から押し直す）"
+      fi
+      ;;
+    wip)
+      target="review/$name"
+      if [ "$no_pr" -eq 0 ] && [ -z "$memory" ]; then
+        die "review に入るには PR body 冒頭の memory ID が要ります: --memory mem_xxx（PR を開かないなら --no-pr）"
+      fi
+      gate "$branch"
+      # push が先、rename は後。push が失敗しても local は wip/ のまま
+      git push --quiet origin "refs/heads/$branch:refs/heads/$target"
+      note "origin/$target へ push"
+      rename "$branch" "$target"
+      git branch --quiet --set-upstream-to "origin/$target" "$target"
+      if remote_has "$branch"; then
+        git push --quiet origin --delete "$branch"
+        note "origin/$branch を削除（backup push は消して押し直す）"
+      fi
+      if [ "$no_pr" -eq 0 ]; then
+        [ -n "$title" ] || title="$(git log -1 --format=%s "$target")"
+        local body
+        body="$memory"$'\n\n'"$(git log --reverse --format='- %s' "$(trunk)..$target")"
+        local -a pr_cmd=(gh pr create --base "$(trunk)" --head "$target" --title "$title" --body "$body")
+        if [ "$dry_run" -eq 1 ]; then
+          echo "dry-run: ${pr_cmd[*]}"
+        else
+          command -v gh >/dev/null || die "gh がありません。手で開く: ${pr_cmd[*]}"
+          "${pr_cmd[@]}"
+        fi
+      fi
+      ;;
+    review) die "$branch は PR が語り手です。直しは PR の中で回す（rename しない）" ;;
+    hotfix) die "$branch は main 起点の一列です。段は無いので main へ PR を" ;;
+  esac
+}
+
+cmd_keep() {
+  local branch
+  branch="$(resolve "${1:-}")"
+  [ "${branch%%/*}" = spike ] || die "keep は spike/ だけ（$branch）"
+  local target="exp/${branch#*/}"
+  rename "$branch" "$target"
+  git push --quiet -u origin "$target"
+  note "origin/$target へ初 push（exp/ は掃除の対象外。閉じるのは本人だけ）"
+}
+
+cmd_drop() {
+  local branch
+  branch="$(resolve "${1:-}")"
+  [ "${branch%%/*}" = spike ] || die "drop は spike/ だけ（$branch）。wip 以降は PR か本人の判断で"
+  if [ "$(git branch --show-current)" = "$branch" ]; then
+    git checkout --quiet "$(trunk)"
+  fi
+  git branch -D "$branch" >/dev/null
+  note "$branch を削除"
+}
+
+cmd_board() {
+  git for-each-ref --sort=-committerdate \
+    --format='%(refname:short)  %(committerdate:relative)' \
+    refs/heads/spike refs/heads/exp refs/heads/wip refs/heads/review refs/heads/hotfix \
+    refs/remotes/origin/review refs/remotes/origin/wip refs/remotes/origin/exp
+}
+
+cmd_install() {
+  local scope="--global" self hooks_dir hook
+  [ "${1:-}" = "--local" ] && scope="--local"
+  self="$(cd "$HERE" && pwd)/branch-step"
+  for name in next keep drop; do
+    git config "$scope" "alias.$name" "!\"$self\" $name"
+  done
+  note "git alias ($scope): next / keep / drop -> $self"
+  hooks_dir="$(git rev-parse --git-path hooks)"
+  hook="$hooks_dir/pre-push"
+  if [ -e "$hook" ] && ! grep -q '^# branch-step pre-push' "$hook"; then
+    die "$hook は別の hook です。上書きしません。中身を統合するか、core.hooksPath で分けてください"
+  fi
+  mkdir -p "$hooks_dir"
+  cp "$HOOK_SRC" "$hook" && chmod +x "$hook"
+  note "pre-push hook: $hook（spike/* の push を拒否）"
+}
+
+case "${1:-}" in
+  next) shift; cmd_next "$@" ;;
+  keep) shift; cmd_keep "$@" ;;
+  drop) shift; cmd_drop "$@" ;;
+  board) shift; cmd_board "$@" ;;
+  install) shift; cmd_install "$@" ;;
+  ""|-h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+  *) die "不明なコマンド: $1（next / keep / drop / board / install）" ;;
+esac
