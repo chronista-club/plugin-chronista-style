@@ -178,11 +178,12 @@ Context Engine の記憶コンテキストが実際に届いていれば活用�
 開発 trunk は **`nightly`**。`main` は**リリース済みの状態**のみを指す。
 
 ```
-memory ─思いつき─▶ spike/x ─GO─▶ wip/x ─検証 green─▶ review/x ─approve─▶ nightly ─release─▶ main ─tag─▶ vX.Y.Z
+memory ─思いつき─▶ spike/x ─GO─▶ wip/x ─検証 green─▶ review/x ─PR(squash)─▶ nightly ─merge(--no-ff)─▶ main ─tag─▶ vX.Y.Z
 ```
 
 - 枝の名前は **`<段>/<slug>`**。段 = prefix（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。段が進んだら rename する（`git next`）。段の意味と操作の本体は `branch-step`
 - 日々の PR は **nightly 宛て**。`git next` が `review/` に入る時に `--base nightly` で開く。手で開くなら `gh pr create --base nightly`
+- nightly 宛て PR の merge は **squash**: `gh pr merge --squash --delete-branch`。その worktree を畳み、`git worktree prune`。締めに起票 memory を `complete_todo`
 - リリースは `release` スキル。nightly → main は **merge commit**（squash すると履歴が発散し、次回リリースで全面コンフリクトする）、main で tag
 - `hotfix/<slug>` だけ main 起点。main へ PR、tag、main を nightly へ back-merge
 

@@ -23,7 +23,7 @@
 | 探る | `spike/<slug>` | 枝 | nightly | **対象**（月次） | `wip/` へ昇格 / `exp/` へ / 削除 |
 | 育てる | `exp/<slug>` | 枝 | nightly | 対象外 | 本人だけが閉じる。学びを memory へ |
 | 作る | `wip/<slug>` | 枝 | nightly | 対象外（古いものは停滞） | `review/` へ |
-| 見せる | `review/<slug>` | 枝 + PR | nightly | 対象外 | merge で消える |
+| 見せる | `review/<slug>` | 枝 + PR | nightly | 対象外 | squash merge で消える |
 | 緊急 | `hotfix/<slug>` | 枝 + PR | **main** | 対象外 | main へ PR、tag、back-merge |
 
 `spike/` は**ローカル専用**。pre-push hook が `refs/heads/spike/*` を拒否する（別名で押すのも拒否、削除は通す）。
@@ -37,12 +37,14 @@ flowchart LR
   spike -.->|git drop| x(( ))
   exp -->|git next| wip
   wip -->|"git next: 門 → push + PR"| review["review/*"]
-  review -->|merge, delete-branch| nightly
+  review -->|"PR(squash), delete-branch"| nightly
   nightly -->|release| main
   main -->|切る| hotfix["hotfix/*"]
   hotfix -->|PR + tag| main
   main -.->|back-merge| nightly
 ```
+
+nightly 宛て PR の merge は **squash**（裁定 2026-10-01）。`train/` の出発だけは merge commit で部品を残す（未決）。nightly → main は `release` スキルどおり `--no-ff`。
 
 下へ戻る遷移は無い。rename は最大 2 回で、どちらも PR が存在する前。`review/` に入ってからの直しは PR の中で回す（draft に戻すだけ）。
 
@@ -52,16 +54,17 @@ flowchart LR
 |---|---|---|
 | `git next` | `spike/` → `wip/` | rename だけ（spike は local） |
 | `git next` | `exp/` → `wip/` | push（`exp/x:refs/heads/wip/x`）→ rename → upstream を `origin/wip/x` に → `origin/exp/x` 削除 |
-| `git next --memory <id>` | `wip/` → `review/` | gh の存在と認証 → 門 → push（`wip/x:refs/heads/review/x`）→ rename → upstream → `origin/wip/*` 削除 → `gh pr create --base <trunk>`（body 冒頭に memory ID） |
+| `git next --memory <id>` | `wip/` → `review/` | gh の存在と認証 → 門 → push（`wip/x:refs/heads/review/x`）→ rename → upstream → `origin/wip/*` 削除 → `gh pr create --base <trunk>`（body 冒頭に memory ID）。PR 作成に失敗したら枝は残し、次の `git next --memory` が PR 作成だけやり直す |
+| `git next` | `review/`（PR あり） | 何もしない。語り手は PR |
 | `git keep` | `spike/` → `exp/` | rename → 初 push（spike の ref は hook が拒否するので rename が先。push に失敗したら名前を戻す） |
-| `git drop` | `spike/` → 削除 | checkout 中なら trunk へ移ってから `branch -D`。trunk が別 worktree で使われていれば detached にする |
+| `git drop` | `spike/` → 削除 | 未 commit があれば止まる。checkout 中なら trunk へ移ってから `branch -D`。trunk が別 worktree で使われていれば detached にする |
 
 trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば nightly、どちらも無ければ main。比較（merge-base、PR 本文）には origin 側の ref を優先する。clone 直後で local に nightly が無くても main 宛てにならない。
 
 ## Implementation
 
-- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。`install` が `git config alias.next '!<path> next'` 等を書き、今いる repo の `.git/hooks/pre-push` に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook は上書きしない
-- slug の解決: 引数無しなら今の枝（段の列でなければ失敗）。引数ありなら `spike|exp|wip|review|hotfix/<slug>` を探し、0 件と複数件は失敗
+- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。`install` が `git config --local alias.next '!<path> next'` 等を書き（既定は今の repo だけ。`--global` は明示時のみ）、今いる repo の `.git/hooks/pre-push` に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook は上書きしない
+- slug の解決: slug は `^[a-z0-9-]+$` に限る（stack 形は未決なので拒否）。引数無しなら今の枝（段の列でなければ失敗）。引数ありなら段ごとに `git show-ref --verify` で完全一致を探し、0 件と複数件は失敗。glob や前方一致は使わない（`drop epic` が `spike/epic/a` を消さない）
 - wip → review の門: 枝が checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていない、または worktree に未 commit の変更があれば止まる（検査した状態と push する状態を一致させる）。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
 - PR 作成は `gh`。`--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。名前を dry-run にしなかったのは、副作用が無いと誤解させないため）
 - pre-push hook: local ref が `HEAD` / `@` なら `git symbolic-ref` で実名に解決してから判定する。local sha が全部 0（SHA-1 / SHA-256 どちらも）は削除なので通す。`<sha>:refs/heads/…` は ref 名を経由しないので止められない（仕様として SKILL.md に明記）
@@ -82,16 +85,21 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 門のテストを「今いる作業ツリー」で走らせる。slug を指定して別の場所から `git next` すると、進める枝ではなく手元の状態を検査してしまう。枝が checkout されている worktree を探してそこで走らせる
 - trunk を local の ref だけで判定する。clone 直後は local に `main` しか無く、PR が main 宛てに開く（防ぎたかった事故そのもの）。origin 側も見る
 - `--dry-run` という名前で push や rename を伴う操作を提供する。下見のつもりで実行される
+- `.github/workflows` を触る commit を agent の枝に混ぜる。OAuth の `workflow` scope が無い token では push が拒否される。CI の変更は mako の手か scope を足した後の別 PR で
+- slug を glob や前方一致で探す。`drop epic` が `spike/epic/a` を消し、`drop '*'` が全部消す
+- `install` の既定を global にする。alias は plugin の版付きパスを指すので、更新で全 repo の `git next` が壊れる
 - 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
 - 門を機械で厳しくしすぎる。「設計に触れたか」は人が決める。警告に留める
 
 ## 検証
 
-`python3 -m unittest tests.test_branch_step -v` — 一時 repo（bare origin 付き）で、spike → wip → review の rename、review での push と PR コマンド（dry-run）、門（test コマンド / design 警告）、keep / drop、install、pre-push の拒否と削除の許可、slug の解決を検証する。`gh` は呼ばない。
+`python3 -m unittest tests.test_branch_step -v` — 一時 repo（bare origin 付き）で、spike → wip → review の rename、review での push と PR コマンド（`--print-pr`）、門（test コマンド / design 警告）、keep / drop、install、pre-push の拒否と削除の許可、slug の解決を検証する。`gh` は呼ばない。
 
 ## Status log
 
 - 2026-10-01: Conception の裁定を受けて Draft。`branch-step` スキル、規約の書き換え（chronista-style / parallel-dev / codeflow）、テストを同じ PR で。
 - 2026-10-01: dogfood の初回 push が token scope（`.github/workflows` の変更）で拒否され、local だけ `review/` になった。push を rename より先に変更し、CI の `bash -n` 追加はテスト側（`test_scripts_parse`）に置き換え。
-- 2026-10-01: Moody Blues のレビュー（PR #1）で再現つきの指摘 8 件。門を枝の worktree で走らせる、trunk 判定に origin を含める、hook の `HEAD:` 解決、exp→wip を push 先行に、`--dry-run` を `--print-pr` に改名、keep の push 失敗で名前を戻す、worktree 内の drop を detached で、`gh` の事前確認、`git board` alias。テスト 17 → 27 件。
+- 2026-10-01: Moody Blues のレビュー（PR #1）で再現つきの指摘 8 件。門を枝の worktree で走らせる、trunk 判定に origin を含める、hook の `HEAD:` 解決、exp→wip を push 先行に、`--dry-run` を `--print-pr` に改名、keep の push 失敗で名前を戻す、worktree 内の drop を detached で、`gh` の事前確認、`git board` alias。テスト 19 → 27 件。
 - 2026-10-01: 再検証で残った 1 件（dirty worktree の門）を修正。hook は `spike/x~0:` の revision 式も止める。テスト 28 件。
+- 2026-10-01: mako 裁定「GO」: nightly 宛て PR は squash、CI の `bash -n` 修正は別 PR（workflow scope が通った後）。
+- 2026-10-01: nexus 側 deep review。`gh pr create` 失敗後に PR 作成だけやり直せる経路、slug の完全一致と stack 形の拒否、dirty な spike の drop 拒否、`install` の既定を `--local` に、merge → worktree 畳み → prune を規約本文に。exp→wip の push 先行は nexus が承認。テスト 32 件。

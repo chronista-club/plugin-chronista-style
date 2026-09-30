@@ -52,6 +52,22 @@ class BranchStepTest(unittest.TestCase):
         return subprocess.run(["bash", str(SCRIPT), *args], cwd=self.work, env=self.env,
                               text=True, capture_output=True, check=check)
 
+    def fake_gh(self, create_exit=0, view_exit=1):
+        """auth status は成功、pr create / pr view の exit を指定できる偽 gh を PATH 先頭に置く。"""
+        bindir = Path(self.tmp.name) / "fakebin"
+        bindir.mkdir(exist_ok=True)
+        gh = bindir / "gh"
+        gh.write_text(f"""#!/bin/sh
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "pr create") echo "fake-pr-created $*"; exit {create_exit} ;;
+  "pr view") exit {view_exit} ;;
+esac
+exit 1
+""")
+        gh.chmod(0o755)
+        return {**self.env, "PATH": f"{bindir}:{self.env['PATH']}"}
+
     def branch(self):
         return self.git("branch", "--show-current").stdout.strip()
 
@@ -211,7 +227,7 @@ class BranchStepTest(unittest.TestCase):
         self.assertNotIn("exp/x", self.remote_branches())
         self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}").stdout.strip(), "origin/wip/x")
 
-    def test_print_pr_has_no_side_effects_beyond_push_and_rename(self):
+    def test_print_pr_pushes_and_renames_without_calling_gh(self):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
         result = self.step("next", "--memory", "mem_T", "--print-pr")
@@ -221,13 +237,66 @@ class BranchStepTest(unittest.TestCase):
     def test_next_to_review_checks_gh_before_pushing(self):
         self.git("checkout", "-q", "-b", "wip/x")
         self.commit("a")
-        env = {**self.env, "PATH": "/usr/bin:/bin"}
+        bindir = Path(self.tmp.name) / "nogh"
+        bindir.mkdir()
+        for tool in ("git", "bash", "sh", "awk", "grep", "wc", "dirname", "cat", "sed"):
+            path = subprocess.run(["which", tool], text=True, capture_output=True, check=True).stdout.strip()
+            (bindir / tool).symlink_to(path)
+        env = {**self.env, "PATH": str(bindir)}
         result = subprocess.run(["bash", str(SCRIPT), "next", "--memory", "mem_T"], cwd=self.work,
                                 env=env, text=True, capture_output=True, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("gh", result.stderr)
         self.assertEqual(self.branch(), "wip/x")
         self.assertNotIn("review/x", self.remote_branches(), "gh が無いなら push もしない")
+
+    def test_pr_create_failure_prints_command_and_can_be_retried(self):
+        self.git("checkout", "-q", "-b", "wip/x")
+        self.commit("a")
+        env = self.fake_gh(create_exit=1)
+        result = subprocess.run(["bash", str(SCRIPT), "next", "--memory", "mem_T"], cwd=self.work,
+                                env=env, text=True, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("gh pr create", result.stderr, "手で打てるコマンドを出す")
+        self.assertEqual(self.branch(), "review/x")
+        env = self.fake_gh(create_exit=0, view_exit=1)
+        result = subprocess.run(["bash", str(SCRIPT), "next", "--memory", "mem_T"], cwd=self.work,
+                                env=env, text=True, capture_output=True, check=True)
+        self.assertIn("fake-pr-created", result.stdout, "review/ で PR が無ければ PR 作成だけやり直せる")
+        env = self.fake_gh(create_exit=0, view_exit=0)
+        result = subprocess.run(["bash", str(SCRIPT), "next"], cwd=self.work,
+                                env=env, text=True, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0, "PR があるなら review/ は語り手が PR。rename も再作成もしない")
+
+    def test_slug_must_match_exactly_and_reject_stack_form(self):
+        self.git("branch", "-q", "spike/epic/a")
+        self.git("branch", "-q", "wip/epic/api")
+        self.git("branch", "-q", "wip/epic/ui")
+        for slug in ("epic", "*", "epic/a", "Epic", "a b"):
+            result = self.step("drop", slug, check=False)
+            self.assertNotEqual(result.returncode, 0, slug)
+            self.assertNotIn("複数の段", result.stderr, slug)
+        self.assertIn("spike/epic/a", self.local_branches())
+        self.git("checkout", "-q", "spike/epic/a")
+        result = self.step("next", check=False)
+        self.assertNotEqual(result.returncode, 0, "stack 形は未決なので今いる枝でも拒否")
+
+    def test_drop_refuses_dirty_worktree(self):
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        (self.work / "dirty.txt").write_text("x\n")
+        result = self.step("drop", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("keep", result.stderr)
+        self.assertEqual(self.branch(), "spike/x")
+
+    def test_install_defaults_to_local_and_rejects_unknown_scope(self):
+        self.step("install")
+        self.assertEqual(self.git("config", "--local", "--get", "alias.next").returncode, 0)
+        self.assertNotEqual(self.git("config", "--global", "--get", "alias.next", check=False).returncode, 0)
+        self.assertNotEqual(self.step("install", "--locl", check=False).returncode, 0)
+        self.step("install", "--global")
+        self.assertEqual(self.git("config", "--global", "--get", "alias.next").returncode, 0)
 
     def test_keep_push_failure_restores_spike(self):
         self.git("checkout", "-q", "-b", "spike/k")
