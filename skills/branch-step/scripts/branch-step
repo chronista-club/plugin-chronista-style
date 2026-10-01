@@ -4,6 +4,16 @@
 # bash なのは、git subcommand と pre-push hook に runtime 依存を持ち込まないため。
 set -euo pipefail
 
+# git は `!` alias の子に GIT_DIR / GIT_PREFIX / GIT_WORK_TREE 等を渡す。そのままだと別 worktree への
+# `git -C` や門のテストが作る一時 repo への git が、本物の repo を触る。ここで剥がす（作者情報や認証は残す）
+for _v in $(compgen -e | grep '^GIT_' || true); do
+  case "$_v" in
+    GIT_AUTHOR_*|GIT_COMMITTER_*|GIT_CONFIG_GLOBAL|GIT_CONFIG_NOSYSTEM|GIT_SSH*|GIT_EDITOR|GIT_EXEC_PATH|GIT_TERMINAL_PROMPT|GIT_ASKPASS|GIT_PAGER|GIT_TRACE*) ;;
+    *) unset "$_v" ;;
+  esac
+done
+unset _v
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_SRC="$HERE/../hooks/pre-push"
 
@@ -17,8 +27,9 @@ branch-step — 段 = prefix、slug は不変
   git keep [<slug>]      spike→exp（rename + 初 push）。育てる
   git drop [<slug>]      spike を削除。無言でよい
   git board              段ごとの ref 一覧（committerdate 順）
-  branch-step install [--local|--global]
+  branch-step install [--local|--global] [--no-hook]
       git alias（next / keep / drop / board。既定は今の repo だけ）と、この repo の pre-push hook を入れる
+      既存の別 pre-push があれば hook は入れずに案内だけ（exit 0）。--no-hook で alias だけ
 EOF
 }
 
@@ -101,7 +112,7 @@ gate() {
   test_cmd="$(git config --get branch-step.test || true)"
   if [ -n "$test_cmd" ]; then
     note "門: テスト ($test_cmd) @ $wt"
-    (cd "$wt" && bash -c "$test_cmd") || die "テストが green ではないので review に進めません"
+    (cd "$wt" && sh -c "$test_cmd") || die "テストが green ではないので review に進めません"
   else
     note "門: テストコマンド未設定（git config branch-step.test '<cmd>' で有効化）"
   fi
@@ -218,22 +229,31 @@ cmd_board() {
 }
 
 cmd_install() {
-  local scope="--local" self hooks_dir hook
-  case "${1:-}" in
-    ""|--local) ;;
-    --global) scope="--global" ;;
-    *) die "install の引数は --local（既定）か --global だけ: $1" ;;
-  esac
+  local scope="--local" no_hook=0 self hooks_dir hook
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --local) scope="--local" ;;
+      --global) scope="--global" ;;
+      --no-hook) no_hook=1 ;;
+      *) die "install の引数は --local（既定）/ --global / --no-hook だけ: $1" ;;
+    esac
+    shift
+  done
   self="$HERE/branch-step"
   for name in next keep drop board; do
     git config "$scope" "alias.$name" "!\"$self\" $name"
   done
   note "git alias ($scope): next / keep / drop / board -> $self"
   note "  このパスは plugin の版に紐づく。plugin を更新したら install をやり直す（--global なら全 repo に効く）"
+  if [ "$no_hook" -eq 1 ]; then
+    note "pre-push hook は入れない（--no-hook）。spike/* の push 拒否は repo 側の hook に任せる"
+    return
+  fi
   hooks_dir="$(git rev-parse --git-path hooks)"
   hook="$hooks_dir/pre-push"
   if [ -e "$hook" ] && ! grep -q '^# branch-step pre-push' "$hook"; then
-    die "$hook は別の hook です。上書きしません。中身を統合するか、core.hooksPath で分けてください"
+    note "pre-push hook は repo 管理（$hook が既にある）。上書きしない。spike/* の拒否はその dispatcher に $HOOK_SRC を vendor して組み込む"
+    return
   fi
   mkdir -p "$hooks_dir"
   cp "$HOOK_SRC" "$hook" && chmod +x "$hook"
