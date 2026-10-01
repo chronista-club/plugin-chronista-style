@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Changed
+- `release` `1.0.0` → `1.0.1`: 前提に worktree の確認を追加。`git worktree list --porcelain` で trunk と main を持つ worktree を見て、今いる worktree が trunk を持っていなければ止まり「lead で行う」と案内する。`core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わないと明記。「4. main に載せて tag」でも `git checkout main` の前に確認し、main 専用 worktree を切る経路を正式に（lane から release して共有 config に `core.bare = true` が入り lead の作業ツリーが取り残された creo-memories 2026-10-01 の事故の根治）
+- `branch-step` `1.0.1` → `1.0.2`: 段 5 に「release は trunk を checkout している lead で行う」を一行
+
 ## [0.33.1] - 2026-10-01
 
 ### Fixed

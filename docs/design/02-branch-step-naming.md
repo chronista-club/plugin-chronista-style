@@ -76,6 +76,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 同時デプロイをなくす三拍（expand / migrate / contract）と `wip/<slug>-contract` の別 loop
 - stack `<段>/<epic>/<n>-<part>`（順番は名前に投影、強制は base 鎖）
 - vendor した pre-push の版ズレ検出（hook 冒頭に version comment を置き、`install` が比較して警告する等）
+- checkout を使わない release: `git fetch` → `git commit-tree -p origin/main -p origin/nightly <tree>` で merge commit を作り `git push origin <sha>:main` → tag。lane からでも安全に出せるが幅が大きい。まずは worktree の前提確認で止める
 - VP lane の枝名（`mako/<name>` → `wip/<slug>`）は VP repo の別 loop。nexus / creo-memories / vantage-point の CLAUDE.md・AGENTS.md 追従も別 loop
 
 ## やってはいけない
@@ -91,6 +92,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `install` の既定を global にする。alias は plugin の版付きパスを指すので、更新で全 repo の `git next` が壊れる
 - git が `!` alias の子に渡す `GIT_DIR` 等をそのまま子プロセスへ流す。creo-memories で実際に起きた: 門のテストが一時 repo を作って git を呼び、`GIT_DIR` が本物を指していたので本物の枝に commit が増え、`origin/nightly` が update-ref され、共有 config に `user.name` が書かれた（巻き戻し済み）。script の先頭で剥がす
 - 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
+- lane（linked worktree）から release を実行する。lead が trunk を持っているので `git checkout` が拒まれ、その回避に共有 config へ `core.bare = true` を入れると lead の作業ツリーが取り残される（creo-memories 2026-10-01）。release スキルは worktree を確かめて lead で行うよう止める。`core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わない
 - 門を機械で厳しくしすぎる。「設計に触れたか」は人が決める。警告に留める
 
 ## 検証
@@ -106,3 +108,4 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-01: mako 裁定「GO」: nightly 宛て PR は squash、CI の `bash -n` 修正は別 PR（workflow scope が通った後）。
 - 2026-10-01: nexus 側 deep review。`gh pr create` 失敗後に PR 作成だけやり直せる経路、slug の完全一致と stack 形の拒否、dirty な spike の drop 拒否、`install` の既定を `--local` に、merge → worktree 畳み → prune を規約本文に。exp→wip の push 先行は nexus が承認。テスト 32 件。
 - 2026-10-01: v0.33.0 の実地（creo-memories）で門のテストが本物の repo を触る事故。script 先頭で git 注入の `GIT_*` を剥がす。linked worktree から alias 経由で再現する回帰テスト。`install` は既存 hook を skip して exit 0、`--no-hook` 追加。branch-step 1.0.1。
+- 2026-10-01: creo-memories の事故（lane から release、core.bare）を受け、release スキルに worktree の前提確認を足す（release 1.0.1、branch-step 1.0.2）。checkout を使わない release は未決へ。

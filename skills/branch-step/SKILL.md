@@ -2,7 +2,7 @@
 name: branch-step
 description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。枝を切る・進める・PR を開く・畳むとき、枝名で迷ったときに使う。
 metadata:
-  version: "1.0.1"
+  version: "1.0.2"
   tags: "git, branch, workflow, parallel-dev, kanban"
   source: "mem_1CfZvzMGQyyyQJLqyZMyR8 (設計と裁定), mem_1CfZz3aDDKfmVm7uRs6w9Z (図)"
 ---
@@ -22,7 +22,7 @@ metadata:
 | 2 | 作っている | `wip/<slug>` | 枝 |
 | 3 | 見せている。PR が開いている | `review/<slug>` | 枝 + PR |
 | 4 | nightly に積まれた | 枝は消える | nightly（`git branch --contains`）。`gh pr merge --squash --delete-branch` → worktree を畳む → `git worktree prune` |
-| 5 | main に出た | `vX.Y.Z` | main + tag（`git describe`）。nightly → main は `release` スキル（merge commit `--no-ff`） |
+| 5 | main に出た | `vX.Y.Z` | main + tag（`git describe`）。nightly → main は `release` スキル（merge commit `--no-ff`）。**release は trunk を checkout している lead で行う**。lane からは出さない |
 | 6 | 学びを残した | 枝なし | memory |
 
 別列: `exp/<slug>` = 生かしておく実験。掃除と停滞検知の対象外、閉じるのは本人だけ。
