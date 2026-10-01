@@ -8,6 +8,8 @@
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-10-01
+
 ### Fixed
 - `branch-step` `1.0.0` → `1.0.1`: git が `!` alias の子に渡す `GIT_DIR` / `GIT_PREFIX` 等を script の先頭で剥がす。剥がさないと、門のテスト（`branch-step.test`）が一時 repo を作って git を呼んだときに本物の repo に commit / update-ref / config 書き込みが起きる（creo-memories で実際に発生、巻き戻し済み）。linked worktree から alias 経由で再現する回帰テストを追加
 
