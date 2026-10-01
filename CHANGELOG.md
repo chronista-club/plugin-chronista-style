@@ -8,10 +8,13 @@
 
 ## [Unreleased]
 
+### Changed
+- `release` `1.0.1` → `1.0.2`: 前提確認の理由を訂正。creo-memories 2026-10-01 の `core.bare = true` は lane からの release の回避ではなく、門が alias から継いだ `GIT_DIR` のまま hook テストの `git init` が走り、本物の repo を bare として再初期化したもの（`git init` は GIT_DIR あり / GIT_WORK_TREE なし / cwd が親でないと bare 判定。0.33.1 の env 剥がしで解消）。worktree の前提確認は「lane から trunk を動かすと二重 checkout で詰まる慣習を止める」ために有効。design 02 の被害の列挙に `core.bare` の書き換えを追加
+
 ## [0.33.2] - 2026-10-01
 
 ### Changed
-- `release` `1.0.0` → `1.0.1`: 前提に worktree の確認を追加。`git worktree list --porcelain` で trunk と main を持つ worktree を見て、今いる worktree が trunk を持っていなければ止まり「lead で行う」と案内する。`core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わないと明記。「4. main に載せて tag」でも `git checkout main` の前に確認し、main 専用 worktree を切る経路を正式に（lane から release して共有 config に `core.bare = true` が入り lead の作業ツリーが取り残された creo-memories 2026-10-01 の事故の根治）
+- `release` `1.0.0` → `1.0.1`: 前提に worktree の確認を追加。`git worktree list --porcelain` で trunk と main を持つ worktree を見て、今いる worktree が trunk を持っていなければ止まり「lead で行う」と案内する。`core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わないと明記。「4. main に載せて tag」でも `git checkout main` の前に確認し、main 専用 worktree を切る経路を正式に（lane から trunk を動かすと二重 checkout で詰まる慣習を止める。訂正: 当初 creo-memories 2026-10-01 の `core.bare = true` をこの経路の回避と見たが、原因は 0.33.1 で直した門の GIT_* 継承だった。0.33.3 の項を参照）
 - `branch-step` `1.0.1` → `1.0.2`: 段 5 に「release は trunk を checkout している lead で行う」を一行
 
 ## [0.33.1] - 2026-10-01
