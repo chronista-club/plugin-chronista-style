@@ -2,7 +2,7 @@
 name: branch-step
 description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。枝を切る・進める・PR を開く・畳むとき、枝名で迷ったときに使う。
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
   tags: "git, branch, workflow, parallel-dev, kanban"
   source: "mem_1CfZvzMGQyyyQJLqyZMyR8 (設計と裁定), mem_1CfZz3aDDKfmVm7uRs6w9Z (図)"
 ---
@@ -51,7 +51,7 @@ git board
 
 ### wip → review の門
 
-- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていない、または未 commit の変更があれば止まる（検査した中身と push する中身を同じにする）
+- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていない、または未 commit の変更があれば止まる（検査した中身と push する中身を同じにする）。git が `!` alias の子に渡す `GIT_DIR` / `GIT_PREFIX` 等は script の先頭で剥がすので、テストが一時 repo を作って git を呼んでも本物の repo には触れない
 - PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
 - trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じ枝」はここで思い出す
 
@@ -60,10 +60,13 @@ git board
 ```bash
 # repo ごとに一度（alias も hook も今の repo だけ）
 bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install
+# alias だけ入れる（hook は repo 側で管理する repo）
+bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install --no-hook
 ```
 
 - `git next` / `keep` / `drop` / `board` の alias を今の repo に書く。alias は script の絶対パス（plugin の版ごとのディレクトリ）を指すので、**plugin を更新したら `install` をやり直す**。`--global` は全 repo に効き、更新で全 repo が壊れうるので、agent は mako に確認してから
-- 今いる repo の `.git/hooks/pre-push` に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。別の pre-push が既にあれば上書きせず止まる。repo ごとに一度 `install` を走らせる
+- 今いる repo の pre-push（`git rev-parse --git-path hooks`。`core.hooksPath` を尊重）に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。repo ごとに一度 `install` を走らせる
+- **既存の別 pre-push がある repo**（`core.hooksPath = .githooks` で dispatcher を持つ等）では、hook は上書きせず案内だけ出して exit 0（alias は入る）。spike の拒否が要るなら `hooks/pre-push` を dispatcher に vendor する（例: `.githooks/pre-push.d/10-branch-step`）。vendor した hook は plugin の更新で自動では追従しない
 
 ## 一覧が board
 

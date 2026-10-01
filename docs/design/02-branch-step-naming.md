@@ -63,7 +63,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 
 ## Implementation
 
-- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。`install` が `git config --local alias.next '!<path> next'` 等を書き（既定は今の repo だけ。`--global` は明示時のみ）、今いる repo の `.git/hooks/pre-push` に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook は上書きしない
+- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。先頭で git が `!` alias の子に注入する `GIT_DIR` / `GIT_WORK_TREE` / `GIT_INDEX_FILE` / `GIT_PREFIX` / `GIT_COMMON_DIR` / `GIT_CONFIG_PARAMETERS` 等を剥がす（`GIT_AUTHOR_*` / `GIT_COMMITTER_*` / `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM` / `GIT_SSH*` / `GIT_EDITOR` / `GIT_EXEC_PATH` は残す）。これが無いと別 worktree への `git -C` や門のテストが本物の repo を触る。`install` が `git config --local alias.next '!<path> next'` 等を書き（既定は今の repo だけ。`--global` は明示時のみ）、今いる repo の pre-push（`--git-path hooks`）に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook があれば上書きせず案内だけで exit 0、`--no-hook` で alias だけ
 - slug の解決: slug は `^[a-z0-9-]+$` に限る（stack 形は未決なので拒否）。引数無しなら今の枝（段の列でなければ失敗）。引数ありなら段ごとに `git show-ref --verify` で完全一致を探し、0 件と複数件は失敗。glob や前方一致は使わない（`drop epic` が `spike/epic/a` を消さない）
 - wip → review の門: 枝が checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていない、または worktree に未 commit の変更があれば止まる（検査した状態と push する状態を一致させる）。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
 - PR 作成は `gh`。`--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。名前を dry-run にしなかったのは、副作用が無いと誤解させないため）
@@ -75,6 +75,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `train/<epic>` — 揃うまで待つ乗り物。部品の PR は train 宛て、全部乗ったら nightly へ PR 一本。取り込みは nightly → train の一方通行
 - 同時デプロイをなくす三拍（expand / migrate / contract）と `wip/<slug>-contract` の別 loop
 - stack `<段>/<epic>/<n>-<part>`（順番は名前に投影、強制は base 鎖）
+- vendor した pre-push の版ズレ検出（hook 冒頭に version comment を置き、`install` が比較して警告する等）
 - VP lane の枝名（`mako/<name>` → `wip/<slug>`）は VP repo の別 loop。nexus / creo-memories / vantage-point の CLAUDE.md・AGENTS.md 追従も別 loop
 
 ## やってはいけない
@@ -88,6 +89,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `.github/workflows` を触る commit を agent の枝に混ぜる。OAuth の `workflow` scope が無い token では push が拒否される。CI の変更は mako の手か scope を足した後の別 PR で
 - slug を glob や前方一致で探す。`drop epic` が `spike/epic/a` を消し、`drop '*'` が全部消す
 - `install` の既定を global にする。alias は plugin の版付きパスを指すので、更新で全 repo の `git next` が壊れる
+- git が `!` alias の子に渡す `GIT_DIR` 等をそのまま子プロセスへ流す。creo-memories で実際に起きた: 門のテストが一時 repo を作って git を呼び、`GIT_DIR` が本物を指していたので本物の枝に commit が増え、`origin/nightly` が update-ref され、共有 config に `user.name` が書かれた（巻き戻し済み）。script の先頭で剥がす
 - 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
 - 門を機械で厳しくしすぎる。「設計に触れたか」は人が決める。警告に留める
 
@@ -103,3 +105,4 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-01: 再検証で残った 1 件（dirty worktree の門）を修正。hook は `spike/x~0:` の revision 式も止める。テスト 28 件。
 - 2026-10-01: mako 裁定「GO」: nightly 宛て PR は squash、CI の `bash -n` 修正は別 PR（workflow scope が通った後）。
 - 2026-10-01: nexus 側 deep review。`gh pr create` 失敗後に PR 作成だけやり直せる経路、slug の完全一致と stack 形の拒否、dirty な spike の drop 拒否、`install` の既定を `--local` に、merge → worktree 畳み → prune を規約本文に。exp→wip の push 先行は nexus が承認。テスト 32 件。
+- 2026-10-01: v0.33.0 の実地（creo-memories）で門のテストが本物の repo を触る事故。script 先頭で git 注入の `GIT_*` を剥がす。linked worktree から alias 経由で再現する回帰テスト。`install` は既存 hook を skip して exit 0、`--no-hook` 追加。branch-step 1.0.1。
