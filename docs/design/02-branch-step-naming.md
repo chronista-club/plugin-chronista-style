@@ -90,9 +90,9 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `.github/workflows` を触る commit を agent の枝に混ぜる。OAuth の `workflow` scope が無い token では push が拒否される。CI の変更は mako の手か scope を足した後の別 PR で
 - slug を glob や前方一致で探す。`drop epic` が `spike/epic/a` を消し、`drop '*'` が全部消す
 - `install` の既定を global にする。alias は plugin の版付きパスを指すので、更新で全 repo の `git next` が壊れる
-- git が `!` alias の子に渡す `GIT_DIR` 等をそのまま子プロセスへ流す。creo-memories で実際に起きた: 門のテストが一時 repo を作って git を呼び、`GIT_DIR` が本物を指していたので本物の枝に commit が増え、`origin/nightly` が update-ref され、共有 config に `user.name` が書かれた（巻き戻し済み）。script の先頭で剥がす
+- git が `!` alias の子に渡す `GIT_DIR` 等をそのまま子プロセスへ流す。creo-memories で実際に起きた: 門のテストが一時 repo を作って git を呼び、`GIT_DIR` が本物を指していたので本物の枝に commit が増え、`origin/nightly` が update-ref され、共有 config に `user.name` が書かれ、**テストの `git init` が本物の repo を bare として再初期化して `core.bare = true` が入った**（`git init` は GIT_DIR あり / GIT_WORK_TREE なし / cwd が親でないと bare 判定。lead の作業ツリーが取り残され status / diff / pull が壊れた。復旧済み）。script の先頭で剥がす（1.0.1）
 - 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
-- lane（linked worktree）から release を実行する。lead が trunk を持っているので `git checkout` が拒まれ、その回避に共有 config へ `core.bare = true` を入れると lead の作業ツリーが取り残される（creo-memories 2026-10-01）。release スキルは worktree を確かめて lead で行うよう止める。`core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わない
+- lane（linked worktree）から release を実行する。lead が trunk を持っているので `git checkout` が拒まれる（二重 checkout）。詰まった時の回避に `core.bare` / `--ignore-other-worktrees` / `--force` / `git worktree remove` を使わない。release スキルは worktree を確かめて lead で行うよう止める（当初 creo-memories 2026-10-01 の `core.bare = true` をこの経路の回避と見たが、実際の原因は上の GIT_* 継承だった。慣習を止める理由は二重 checkout で詰まること）
 - 門を機械で厳しくしすぎる。「設計に触れたか」は人が決める。警告に留める
 
 ## 検証
@@ -108,4 +108,5 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-01: mako 裁定「GO」: nightly 宛て PR は squash、CI の `bash -n` 修正は別 PR（workflow scope が通った後）。
 - 2026-10-01: nexus 側 deep review。`gh pr create` 失敗後に PR 作成だけやり直せる経路、slug の完全一致と stack 形の拒否、dirty な spike の drop 拒否、`install` の既定を `--local` に、merge → worktree 畳み → prune を規約本文に。exp→wip の push 先行は nexus が承認。テスト 32 件。
 - 2026-10-01: v0.33.0 の実地（creo-memories）で門のテストが本物の repo を触る事故。script 先頭で git 注入の `GIT_*` を剥がす。linked worktree から alias 経由で再現する回帰テスト。`install` は既存 hook を skip して exit 0、`--no-hook` 追加。branch-step 1.0.1。
-- 2026-10-01: creo-memories の事故（lane から release、core.bare）を受け、release スキルに worktree の前提確認を足す（release 1.0.1、branch-step 1.0.2）。checkout を使わない release は未決へ。
+- 2026-10-01: creo-memories の `core.bare = true` を受け、release スキルに worktree の前提確認を足す（release 1.0.1、branch-step 1.0.2）。checkout を使わない release は未決へ。
+- 2026-10-01: 訂正（creo-memories lane が scratch で再現）。`core.bare = true` の原因は lane からの release ではなく、門の GIT_* 継承で hook テストの `git init` が本物を bare 化したこと（1.0.1 で解消済み）。前提確認は二重 checkout を止める目的でそのまま有効。release 1.0.2 で文言を訂正
