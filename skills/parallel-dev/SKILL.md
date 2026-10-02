@@ -2,7 +2,7 @@
 name: parallel-dev
 description: 並列開発の作業単位を決めるとき、スコープが混ざったとき、worktree / VP lane / stacked PR のどれを使うか迷ったときに使用。「隔離・出荷」2層モデルで道具を選ぶ判断スキル。
 metadata:
-  version: "0.2.3"
+  version: "0.2.4"
   tags: "parallel, worktree, vantage-point, stacked-pr, workflow"
 ---
 
@@ -25,7 +25,7 @@ metadata:
 worktree は「作業ディレクトリごと分ける」ので、隔離は構造的に保証される。
 1つの作業コピーに複数スコープを同居させる方式は、テストが混合状態に対して走るため採らない。
 
-枝の名前は隔離の道具に依らず同じ: `<段>/<slug>`（`spike/` `wip/` `review/`）。session worktree でも VP lane でも枝は `wip/<slug>`、ディレクトリ名も slug。段の意味と `git next` / `keep` / `drop` は `branch-step`。
+ブランチの名前は隔離の道具に依らず同じ: `<段>/<slug>`（`spike/` `wip/` `review/`）。session worktree でも VP lane でもブランチは `wip/<slug>`、ディレクトリ名も slug。段の意味と `git next` / `keep` / `drop` は `branch-step`。
 
 ## 判断ルール
 

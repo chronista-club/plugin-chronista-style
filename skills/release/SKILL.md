@@ -2,7 +2,7 @@
 name: release
 description: リリースの背骨 — 版の検出・CHANGELOG・release commit・nightly → main・tag・GitHub Release。尻尾（CI / publish / 署名 / 配置）はプロジェクト側に委譲
 metadata:
-  version: "1.0.2"
+  version: "1.0.3"
 ---
 
 # Release
@@ -20,7 +20,7 @@ metadata:
 - **版の正本**: `.claude-plugin/plugin.json` / `.codex-plugin/plugin.json`（プラグイン。両方あればリポジトリの同期規約を読み、同じ版を維持）/ `Cargo.toml`（`workspace.package.version` か `package.version`）/ `package.json`（monorepo なら package ごと）/ Swift アプリは tag が正本（`git describe --tags` で読む設計なら、tag を打つこと自体が版付け）
 - **trunk モデル**: `nightly` ブランチがあり今そこにいるなら **nightly モデル**（nightly → main を merge して main で tag）。無ければ **main モデル**（今のブランチで tag）
 - **前提**: working tree が clean、trunk の最新（`git pull`）。満たさなければ止まって報告
-- **前提（worktree）**: `git worktree list --porcelain` で、trunk と main を**どの worktree が checkout しているか**を見る。**今いる worktree が trunk を持っていなければ止まる** — 「release は trunk を checkout している worktree（lead）で行う」と案内して終える。lane（linked worktree）から trunk を動かそうとすると、lead が持つ枝の checkout を git が拒む（二重 checkout）。詰まった時に **`core.bare` を触る / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わない**（共有 config の `core.bare = true` は lead の作業ツリーを取り残し、status / diff / pull が全部壊れる）。lane から trunk を動かす慣習そのものを止める
+- **前提（worktree）**: `git worktree list --porcelain` で、trunk と main を**どの worktree が checkout しているか**を見る。**今いる worktree が trunk を持っていなければ止まる** — 「release は trunk を checkout している worktree（lead）で行う」と案内して終える。lane（linked worktree）から trunk を動かそうとすると、lead が持つブランチの checkout を git が拒む（二重 checkout）。詰まった時に **`core.bare` を触る / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わない**（共有 config の `core.bare = true` は lead の作業ツリーを取り残し、status / diff / pull が全部壊れる）。lane から trunk を動かす慣習そのものを止める
 - **直前のリリース**: `git tag --sort=-creatordate | head -1`、差分は `git log <tag>..HEAD --oneline`。release commit の流儀も直前のものに合わせる（`release: vX.Y.Z — 要約` が既定。`chore(release): X.Y.Z — 要約` の流儀ならそれに）
 - **CI の起点**: `.github/workflows/*.yml` の `on:` を読む。`tags: ['v*']` があれば tag の push が尻尾を起動する。`branches: [main]` で tag を打つ workflow（`release-tag.yml` 等）があれば **自分では tag を打たない**
 - **尻尾の有無**: 下記「尻尾の検出」
@@ -40,7 +40,7 @@ metadata:
 
 ### 4. main に載せて tag を打つ
 
-**nightly モデル**。先に `git worktree list --porcelain` で main を持つ worktree を見る。別の worktree が main を持っていればそこで行う（lead でなければ止まる）。どこにも無ければ lead で `git checkout main` するか、lead の枝を動かさずに **main 専用の worktree を切る**（`git worktree add <tmp> main` → その中で merge / tag / push → `git worktree remove <tmp>`）。回避手段は前提と同じく使わない。
+**nightly モデル**。先に `git worktree list --porcelain` で main を持つ worktree を見る。別の worktree が main を持っていればそこで行う（lead でなければ止まる）。どこにも無ければ lead で `git checkout main` するか、lead のブランチを動かさずに **main 専用の worktree を切る**（`git worktree add <tmp> main` → その中で merge / tag / push → `git worktree remove <tmp>`）。回避手段は前提と同じく使わない。
 
 ```bash
 git worktree list --porcelain | grep -B2 'refs/heads/main$'   # main を持つ worktree が無いこと
