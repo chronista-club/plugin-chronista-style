@@ -9,6 +9,7 @@
 ## [Unreleased]
 
 ### Changed
+- 語彙: 「枝」→「ブランチ」（mako 裁定 2026-10-02「『枝』は『ブランチ』で、今後語彙を合わせよう」）。`branch-step` `1.0.2` → `1.0.3`（SKILL / design 02 / script の利用者向けメッセージ / テストの文言）、`release` 1.0.2 → 1.0.3、`parallel-dev` `0.2.3` → `0.2.4`、`chronista-style` `6.1.3` → `6.1.4`。コードの識別子は対象外
 - `release` `1.0.1` → `1.0.2`: 前提確認の理由を訂正。creo-memories 2026-10-01 の `core.bare = true` は lane からの release の回避ではなく、門が alias から継いだ `GIT_DIR` のまま hook テストの `git init` が走り、本物の repo を bare として再初期化したもの（`git init` は GIT_DIR あり / GIT_WORK_TREE なし / cwd が親でないと bare 判定。0.33.1 の env 剥がしで解消）。worktree の前提確認は「lane から trunk を動かすと二重 checkout で詰まる慣習を止める」ために有効。design 02 の被害の列挙に `core.bare` の書き換えを追加
 
 ## [0.33.2] - 2026-10-01

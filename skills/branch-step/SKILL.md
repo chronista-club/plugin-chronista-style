@@ -1,8 +1,8 @@
 ---
 name: branch-step
-description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。枝を切る・進める・PR を開く・畳むとき、枝名で迷ったときに使う。
+description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。ブランチを切る・進める・PR を開く・畳むとき、ブランチ名で迷ったときに使う。
 metadata:
-  version: "1.0.2"
+  version: "1.0.3"
   tags: "git, branch, workflow, parallel-dev, kanban"
   source: "mem_1CfZvzMGQyyyQJLqyZMyR8 (設計と裁定), mem_1CfZz3aDDKfmVm7uRs6w9Z (図)"
 ---
@@ -17,19 +17,19 @@ metadata:
 
 | 段 | 何をしている | 名前 | 語り手 |
 |---|---|---|---|
-| 0 | 思いついた。コード無し | 枝なし | memory |
-| 1 | 探っている。捨ててよい | `spike/<slug>` | 枝（**ローカル専用**） |
-| 2 | 作っている | `wip/<slug>` | 枝 |
-| 3 | 見せている。PR が開いている | `review/<slug>` | 枝 + PR |
-| 4 | nightly に積まれた | 枝は消える | nightly（`git branch --contains`）。`gh pr merge --squash --delete-branch` → worktree を畳む → `git worktree prune` |
+| 0 | 思いついた。コード無し | ブランチなし | memory |
+| 1 | 探っている。捨ててよい | `spike/<slug>` | ブランチ（**ローカル専用**） |
+| 2 | 作っている | `wip/<slug>` | ブランチ |
+| 3 | 見せている。PR が開いている | `review/<slug>` | ブランチ + PR |
+| 4 | nightly に積まれた | ブランチは消える | nightly（`git branch --contains`）。`gh pr merge --squash --delete-branch` → worktree を畳む → `git worktree prune` |
 | 5 | main に出た | `vX.Y.Z` | main + tag（`git describe`）。nightly → main は `release` スキル（merge commit `--no-ff`）。**release は trunk を checkout している lead で行う**。lane からは出さない |
-| 6 | 学びを残した | 枝なし | memory |
+| 6 | 学びを残した | ブランチなし | memory |
 
 別列: `exp/<slug>` = 生かしておく実験。掃除と停滞検知の対象外、閉じるのは本人だけ。
 例外: `hotfix/<slug>` = main 起点の一列。main へ PR、tag、main を nightly へ back-merge。
 
 slug は起票 memory の Branch slug と同じ（`[a-z0-9-]+`、完全一致で探す）。worktree のディレクトリ名も slug。stack 形（`<段>/<epic>/<part>`）は未決なので script は扱わない。
-起点は全列 nightly なので名前に載せない。type（feat / fix）は commit message の仕事で、枝名には載せない。
+起点は全列 nightly なので名前に載せない。type（feat / fix）は commit message の仕事で、ブランチ名には載せない。
 
 ## 操作は三つ
 
@@ -44,16 +44,16 @@ git board
   review に入る時だけ **push して PR を開く**（base は trunk = `nightly`。local に無くても origin にあれば nightly、どちらにも無ければ `main`。body 冒頭に `--memory` の ID）。
   順序は **push が先、rename が後**。push が失敗しても local の名前は変わらない。`wip/` の backup push があれば消して `review/` で押し直す。`review/` から先は rename しない — 直しは PR の中で回す。
   `--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。本物の dry-run ではない）。
-  `gh pr create` に失敗しても枝は `review/` のまま残り、手で打つコマンドが出る。もう一度 `git next --memory` すれば PR 作成だけやり直す
+  `gh pr create` に失敗してもブランチは `review/` のまま残り、手で打つコマンドが出る。もう一度 `git next --memory` すれば PR 作成だけやり直す
 - **`git keep`**: `spike/` → `exp/`。ここで初めて外に出る（初 push。失敗したら `spike/` に名前を戻す）
 - **`git drop`**: `spike/` を削除。無言でよい。`wip/` 以降は消さない。未 commit の変更があれば止まる（捨てるなら stash、残すなら commit して `git keep`）
-- slug を省くと今いる枝。trunk 上や別の枝からは slug を指定する。`git drop` を linked worktree の中で使うと、その worktree は detached になる（あとで `git worktree remove`）
+- slug を省くと今いるブランチ。trunk 上や別のブランチからは slug を指定する。`git drop` を linked worktree の中で使うと、その worktree は detached になる（あとで `git worktree remove`）
 
 ### wip → review の門
 
-- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**その枝が checkout されている worktree の中**で走る。どこにも checkout されていない、または未 commit の変更があれば止まる（検査した中身と push する中身を同じにする）。git が `!` alias の子に渡す `GIT_DIR` / `GIT_PREFIX` 等は script の先頭で剥がすので、テストが一時 repo を作って git を呼んでも本物の repo には触れない
+- `git config branch-step.test '<cmd>'` があればそれを走らせ、exit 0 でなければ進めない。未設定なら「未設定」と告げて通す。テストは**そのブランチが checkout されている worktree の中**で走る。どこにも checkout されていない、または未 commit の変更があれば止まる（検査した中身と push する中身を同じにする）。git が `!` alias の子に渡す `GIT_DIR` / `GIT_PREFIX` 等は script の先頭で剥がすので、テストが一時 repo を作って git を呼んでも本物の repo には触れない
 - PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
-- trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じ枝」はここで思い出す
+- trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じブランチ」はここで思い出す
 
 ## 導入
 
@@ -80,7 +80,7 @@ git board
 git for-each-ref --format='%(refname:short)' refs/heads/spike/ | xargs -r git branch -D
 ```
 
-`git push --all` は spike が 1 本でもあると hook が push 全体を止める。押すなら枝を指定する。VP はこの一覧を描くだけ。
+`git push --all` は spike が 1 本でもあると hook が push 全体を止める。押すならブランチを指定する。VP はこの一覧を描くだけ。
 
 ## やらないこと
 
