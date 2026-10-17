@@ -1,6 +1,6 @@
 # 03. 前提の再検証と失敗を防ぐ仕組み
 
-> **Status**: Draft
+> **Status**: Active
 > **Related**: `mem_1Cg7qNf32jB4JLHHGHfnYH`（方針と裁定）
 > **対象**: `skills/codeflow/SKILL.md`, `evals/hypothesis-gates/`
 
@@ -27,3 +27,5 @@ codeflow の Learning は、失敗を注意書きだけに残さず、まず正�
 ## Status log
 
 - 2026-10-17: 合意した6ケースで3スキルの候補を比較。systematic-debugging / verification の改訂は取り下げ、codeflow の Learning に絞って追加評価。未リリース。
+
+- 2026-10-17: v0.34.0 で codeflow の採用差分と評価資料を出荷。
