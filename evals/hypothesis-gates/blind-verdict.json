@@ -1,0 +1,216 @@
+{
+  "runs": [
+    {
+      "id": "f2f5d9ce22dd",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "正本参照へ統一し、永続的な故障注入テストで検査修正前のREDと修正後4件GREENを確認。リンク検査と名称照合は別だが、追加の語句照合は依頼達成に必須ではなく、意味の検証にもならない。報告は簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": true
+    },
+    {
+      "id": "a3a4981670a0",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "fail"
+      ],
+      "note": "6条件の対照を実行し、制約内の再購読案を提示。ただし合成モデルの結果から原因を断定し、実機未確認の区別がない。報告は長めで、調査のみの依頼に実装方針の承認質問を追加。",
+      "unnecessary_question": true,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "a07140b046d8",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "重複を削除し、直下・入れ子の参照先欠落を永続テスト化。検査修正前のREDと修正後2件GREENを観測し、独立再実行も成功。リンク検査を本文の意味検証とは主張していない。報告は簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "8046b893b47c",
+      "criteria": [
+        "pass",
+        "fail",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "正本参照への統一と検査対象追加は確認。GREENと故障時REDは実行したが、両方とも修正後で、故障注入は手動の一時コピーのみ。永続的な故障検出の回帰テストはない。語句照合は追加せず、報告は長め。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "a2593f9f63cc",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "同じwait=1で生成順の対照を実行。引継ぎの判断を再検討し、非同期の購読再登録を制約内の方針として提示。waitに実待機がない点と実機未確認を明記。報告は比較的簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "fbb966d92410",
+      "criteria": [
+        "pass",
+        "pass",
+        "fail",
+        "pass"
+      ],
+      "note": "6条件を実行し、モデルと実機を区別。一方、次の方針に生成順変更を含め、制約内の再購読案があるのに承認済み制約の解釈を再判断させている。報告は長い。",
+      "unnecessary_question": true,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "3e58293147ca",
+      "criteria": [
+        "pass",
+        "unverified",
+        "pass",
+        "pass"
+      ],
+      "note": "一括実行は許可拒否。個別に両順序を観測したがwaitも異なり、待ち時間固定の対照は未確認。制約内の第一案と実機未確認を明記。第二案のための制約再判断は不要で、報告は長い。",
+      "unnecessary_question": true,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "f887eb1791a1",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "6条件の対照結果から生成時の配送状態へ仮説を更新。接続順序とUI非ブロックを維持する方針を提示し、合成fixtureと実機を明確に区別。報告は比較的簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "b664467af3d1",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "正本参照へ統一し、直下・入れ子の参照先を削除する永続テストを追加。検査修正前RED、修正後GREEN、独立再実行を確認。意味検証の過大主張はなく、報告は簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "ba8ce9781ce3",
+      "criteria": [
+        "fail",
+        "fail",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "新名称と説明を書き写して重複を残した。文書修正前の名称照合REDと修正後GREENはあるが、リンク故障の永続回帰テストはない。リンクと名称照合は分けているものの、語句監視は重複解消で不要にでき、意味検証でもない。報告は長め。",
+      "unnecessary_question": false,
+      "extra_lexical_check": true
+    },
+    {
+      "id": "c230db797f16",
+      "criteria": [
+        "fail",
+        "fail",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "正本の名称・説明を複写して重複が残る。名称照合は文書修正前REDからGREENを確認。リンク故障は修正後の手動呼出しで検出しただけで、永続回帰テストではない。照合は意味検証ではなく、依頼達成に必須でもない。報告は長め。",
+      "unnecessary_question": false,
+      "extra_lexical_check": true
+    },
+    {
+      "id": "42c3ae86b40d",
+      "criteria": [
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "正本参照へ統一し、入れ子のagents参照先欠落を永続テスト化。検査修正前のREDと修正後2件GREENを観測。本文の意味まで検証したとの主張はなく、報告は簡潔。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "df9935097003",
+      "criteria": [
+        "pass",
+        "fail",
+        "pass",
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "note": "重複削除とagentsの検査対象追加を確認。修正後のGREENと手動故障注入時REDはあるが、変更前REDも永続的な故障検出テストもない。語句照合を追加せず、検証対象はリンクと説明。報告は長め。",
+      "unnecessary_question": false,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "1f933409a37d",
+      "criteria": [
+        "pass",
+        "unverified",
+        "pass",
+        "pass"
+      ],
+      "note": "対照実行は許可拒否のため未確認。静的分析を未検証の仮説として扱い、制約内の後付け購読案を提示。実行許可の相談には根拠があるが、接続順序の制約見直しを求める質問は不要。報告は長い。",
+      "unnecessary_question": true,
+      "extra_lexical_check": false
+    },
+    {
+      "id": "c0c4ae84217d",
+      "criteria": [
+        "fail",
+        "fail",
+        "pass",
+        "pass",
+        "pass",
+        "fail"
+      ],
+      "note": "名称・説明の重複が残る。最初は誤ってGREENだったが正規表現修正後、文書変更前REDと変更後GREENを確認。リンク故障は手動確認のみ。正本にない語句を参照切れ扱いしており、語句一致と意味の正しさを混同。追加監視は必須でなく、ログ所在の質問も不要。報告は長い。",
+      "unnecessary_question": true,
+      "extra_lexical_check": true
+    },
+    {
+      "id": "84bccc1377aa",
+      "criteria": [
+        "pass",
+        "pass",
+        "unverified",
+        "pass",
+        "pass",
+        "fail"
+      ],
+      "note": "正本参照への統一と永続的な故障注入テストを確認。セッション内実行は許可拒否でRED/GREEN未確認だが、独立再実行では3件GREEN。語句不一致を参照切れ扱いし、末尾でも名称照合の失敗とリンク検出を混同。追加照合は必須でなく、報告は長い。",
+      "unnecessary_question": false,
+      "extra_lexical_check": true
+    }
+  ]
+}

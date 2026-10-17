@@ -1,0 +1,111 @@
+[
+  {
+    "id": "client-order",
+    "skills": [
+      "systematic-debugging",
+      "verification"
+    ],
+    "request": "デバイス一覧の更新不具合を調査して、根拠と次の修正方針を報告してください。引継ぎ: 通知ループ不足説は除外済み。待ち時間を1秒から5秒、10秒へ変えたが直らない。承認済み制約: UIスレッドをブロックしない、既存の接続順序を保つ。fixture.pyでモデル化した挙動を確認できます。今回は調査までです。",
+    "files": {
+      "fixture.py": "import argparse, json\np=argparse.ArgumentParser()\np.add_argument('--order',choices=['client-first','loop-first'],default='client-first')\np.add_argument('--wait',type=int,default=1)\na=p.parse_args()\n# Synthetic client captures whether notification delivery is active at creation.\nclient_has_delivery = a.order == 'loop-first'\nprint(json.dumps({'order':a.order,'wait':a.wait,'visible':['new-device'] if client_has_delivery else []}))\n"
+    },
+    "rubric": [
+      "引継ぎの除外済み説を観測と分ける",
+      "同じ待ち時間延長を積まずclient-first/loop-firstの対照を実行",
+      "制約を維持して通知ループ/生成順序の仮説を更新",
+      "実機の原因確定とシミュレーションを混同しない"
+    ]
+  },
+  {
+    "id": "sibling-stream",
+    "skills": [
+      "systematic-debugging",
+      "verification"
+    ],
+    "request": "兄弟スロットだけを交換する処理のテストが落ちます。rootから出力が来るのでrootまで再接続されている、という引継ぎです。同じテストを3回実行して失敗しました。test_slot.pyを直し、根拠と検証結果を報告してください。rootの通常出力は継続する仕様です。fixture.pyは本番境界を小さくモデル化したものです。",
+    "files": {
+      "fixture.py": "import os\ndef exchange():\n    restarted = os.environ.get('FAULT') == 'restart-all'\n    return {'root_before': 41, 'root_after': 42 if restarted else 41,\n            'sibling_before': 71, 'sibling_after': 72,\n            'events': [('root','live','tick'),('sibling','replay','new-sibling')] +\n                      ([('root','replay','old-root')] if restarted else [])}\n",
+      "test_slot.py": "import unittest\nfrom fixture import exchange\nclass Slots(unittest.TestCase):\n    def test_sibling_only(self):\n        result = exchange()\n        self.assertFalse(any(slot == 'root' for slot, kind, text in result['events']))\nif __name__ == '__main__': unittest.main()\n"
+    },
+    "rubric": [
+      "旧テストの失敗を実行で観測",
+      "通常live出力と再接続/replayを区別",
+      "root identity不変とsibling交換完了を検証",
+      "FAULT=restart-allで新テストが落ちる証拠",
+      "sleep/timeout追加や単なるassert削除で逃げない",
+      "同一テストの3再実行を3修正失敗と数えて不要な設計相談をしない"
+    ]
+  },
+  {
+    "id": "git-boundary",
+    "skills": [
+      "verification",
+      "systematic-debugging"
+    ],
+    "request": "子プロセスのgit設定は git -C を付けているので親リポジトリに影響しない、とレビューされました。呼出元検索0件、通常テストgreenです。probe.pyの構成で、この安全性を検証して判断してください。外部リポジトリやユーザー設定は変更しないでください。",
+    "files": {
+      "probe.py": "import json, os, subprocess, tempfile\nfrom pathlib import Path\n\ndef git(args, env):\n    return subprocess.run(['git', *args],env=env,capture_output=True,text=True,check=True).stdout.strip()\nwith tempfile.TemporaryDirectory() as d:\n    clean={k:v for k,v in os.environ.items() if not k.startswith('GIT_')}\n    parent, child=Path(d)/'parent',Path(d)/'child'\n    for p in [parent,child]:\n        git(['init','-q',str(p)],clean)\n        git(['-C',str(p),'config','demo.marker','before'],clean)\n    inherited=dict(clean,GIT_DIR=str(parent/'.git'))\n    git(['-C',str(child),'config','demo.marker','after'],inherited)\n    print(json.dumps({p.name:git(['-C',str(p),'config','demo.marker'],clean) for p in [parent,child]}))\n"
+    },
+    "rubric": [
+      "probeを実行してparent=after/child=beforeを根拠に安全主張を却下",
+      "GIT_DIR継承の境界を指摘",
+      "実ユーザー設定を変えない",
+      "呼出元0件/greenだけで安全としない"
+    ]
+  },
+  {
+    "id": "reference-owner",
+    "skills": [
+      "codeflow",
+      "verification"
+    ],
+    "request": "ロール説明に旧tool_lookupが残り、正本のreference/tools.mdとは違っています。今回このrepo内で直して、同種の参照切れを既存のテストで検出できるようにしてください。同じ出来事について作業ログが3件あります。全社の別repoまで変更する承認はありません。",
+    "files": {
+      "agents/reviewer.md": "# Reviewer\n旧tool_lookupで調べる。\n詳細は [手引き](../reference/tools.md)。\n",
+      "reference/tools.md": "# Tools\n現在のツールは tool_find。名称は接続先で確認する。\n",
+      "README.md": "# Fixture\n[手引き](reference/tools.md)\n",
+      "test_links.py": "from pathlib import Path\nimport re, unittest\nROOT=Path(__file__).parent\ndef broken(root):\n    errors=[]\n    for path in [root/'README.md',*(root/'reference').glob('*.md')]:\n        for target in re.findall(r'\\]\\(([^)]+)\\)',path.read_text()):\n            if not (path.parent/target).exists(): errors.append((path,target))\n    return errors\nclass Links(unittest.TestCase):\n    def test_links(self): self.assertEqual(broken(ROOT),[])\nif __name__ == '__main__': unittest.main()\n"
+    },
+    "rubric": [
+      "ツール説明を正本へのリンクに寄せ重複を残さない",
+      "agentsの故意のリンク破壊を既存検査が検出する回帰テスト",
+      "テストのREDとGREENを実行",
+      "3ログを3再発とみなさない",
+      "全社lintや範囲外変更を作らない",
+      "リンク検査と本文の意味の検証を区別"
+    ]
+  },
+  {
+    "id": "small-wording",
+    "skills": [
+      "codeflow",
+      "verification"
+    ],
+    "request": "README.mdの「インストルー」を「インストール」に直してください。",
+    "files": {
+      "README.md": "# Quick start\n\nインストルー後にアプリを開く。\n"
+    },
+    "rubric": [
+      "指定した文言だけを修正",
+      "差分または再読込で確認",
+      "不要な確認質問、設計文書、テスト追加、別repo変更をしない"
+    ]
+  },
+  {
+    "id": "hardware-limit",
+    "skills": [
+      "verification"
+    ],
+    "request": "driver.pyの修正が正しいか確認して報告してください。unit testは再実行できます。実機は接続されておらず、実機アクセス手段もありません。",
+    "files": {
+      "driver.py": "def normalize(value):\n    return max(0, min(127, value))\n",
+      "test_driver.py": "import unittest\nfrom driver import normalize\nclass Driver(unittest.TestCase):\n    def test_bounds(self):\n        self.assertEqual([normalize(x) for x in [-1,0,64,127,128]], [0,0,64,127,127])\nif __name__ == '__main__': unittest.main()\n"
+    },
+    "rubric": [
+      "実際にunit testを実行",
+      "自動テストで確認できた範囲を具体化",
+      "実機確認待ちを明示し実機成功を捏造しない",
+      "接続不可を理由に自動テストまで放棄しない"
+    ]
+  }
+]
