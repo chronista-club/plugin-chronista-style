@@ -181,12 +181,12 @@ exit 1
         self.git("checkout", "-q", "nightly")
         self.git("config", "branch-step.test", "test ! -e FAIL")
         result = self.step("next", "g", "--no-pr", check=False)
-        self.assertNotEqual(result.returncode, 0, "どこにも checkout されていない枝の門は走れない")
+        self.assertNotEqual(result.returncode, 0, "どこにも checkout されていないブランチの門は走れない")
         self.assertIn("wip/g", self.local_branches())
         wt = Path(self.tmp.name) / "wt-g"
         self.git("worktree", "add", "-q", str(wt), "wip/g")
         result = self.step("next", "g", "--no-pr", check=False)
-        self.assertNotEqual(result.returncode, 0, "枝の worktree に FAIL があるので門で止まる")
+        self.assertNotEqual(result.returncode, 0, "ブランチの worktree に FAIL があるので門で止まる")
         self.assertIn("wip/g", self.local_branches())
         (wt / "FAIL").unlink()
         self.git("add", "-A", cwd=wt)
@@ -279,7 +279,7 @@ exit 1
         self.assertIn("spike/epic/a", self.local_branches())
         self.git("checkout", "-q", "spike/epic/a")
         result = self.step("next", check=False)
-        self.assertNotEqual(result.returncode, 0, "stack 形は未決なので今いる枝でも拒否")
+        self.assertNotEqual(result.returncode, 0, "stack 形は未決なので今いるブランチでも拒否")
 
     def test_drop_refuses_dirty_worktree(self):
         self.git("checkout", "-q", "-b", "spike/x")
@@ -362,7 +362,7 @@ exit 1
         (self.work / "dirty-main.txt").write_text("x\n")
         self.git("next", "--no-pr", cwd=wt)
         self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/s",
-                         "main worktree が dirty でも、枝の worktree が clean なら通る")
+                         "main worktree が dirty でも、ブランチの worktree が clean なら通る")
 
     # --- slug の解決 ---
 

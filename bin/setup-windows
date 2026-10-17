@@ -52,7 +52,7 @@ WINGET_RUST_CLI=(
 # --- 開発インフラ ---
 WINGET_DEV_INFRA=(
   GitHub.cli                  # gh
-  jdx.mise                    # 言語ランタイムの SSOT
+  jdx.mise                    # タスク実行・プロジェクト別ランタイム管理
   jqlang.jq                   # JSON 処理
   ellie.atuin                 # shell history sync
   RubyInstallerTeam.Ruby.3.3  # Ruby ランタイム
@@ -135,7 +135,7 @@ install_cargo() {
       # shellcheck disable=SC2086  # word splitting は意図的（複数引数渡し）
       cargo install $install_arg
     else
-      echo "  ⚠ cargo 未検出 → mise で rust toolchain を入れてから再実行"
+      echo "  ⚠ cargo 未検出 → rustup で Rust toolchain を入れてから再実行"
       echo "    手動: cargo install $install_arg"
     fi
   fi
@@ -208,7 +208,7 @@ elif [ -d "$VP_CLI_PATH" ]; then
     echo "  Installing vp from $VP_CLI_PATH..."
     cargo install --path "$VP_CLI_PATH"
   else
-    echo "  ⚠ cargo 未検出 → mise で rust toolchain 入れてから再実行"
+    echo "  ⚠ cargo 未検出 → rustup で Rust toolchain 入れてから再実行"
   fi
 else
   echo "  • vp: ~/repos/vantage-point を clone してから再実行"
@@ -223,7 +223,7 @@ elif [ -d "$FLEETSTAGE_CLI_PATH" ]; then
     echo "  Installing fsctl from $FLEETSTAGE_CLI_PATH..."
     cargo install --path "$FLEETSTAGE_CLI_PATH"
   else
-    echo "  ⚠ cargo 未検出 → mise で rust toolchain 入れてから再実行"
+    echo "  ⚠ cargo 未検出 → rustup で Rust toolchain 入れてから再実行"
   fi
 else
   echo "  • fsctl: ~/repos/fleetstage を clone してから再実行"
