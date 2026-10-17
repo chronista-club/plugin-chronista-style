@@ -64,7 +64,7 @@ RUST_CLI=(
 # --- 開発インフラ ---
 DEV_INFRA=(
   gh                # GitHub CLI
-  mise              # バージョン管理（言語ランタイムの SSOT）
+  mise              # バージョン管理（タスク実行・プロジェクト別ランタイム管理）
   tmux              # セッション管理（並列開発）
   jq                # JSON 処理
   atuin             # shell history sync（セッション横断検索）
@@ -74,7 +74,7 @@ DEV_INFRA=(
 
 # --- ビルド支援（cross-build-image skill の前提） ---
 BUILD_SUPPORT=(
-  sccache    # Rust ビルドキャッシュ（多層 cache の核）
+  sccache    # 既存の cross-build 用。mbx との wrapper 併用は個別に確認
   zig        # cargo-zigbuild 用 cross-compile toolchain
 )
 
@@ -94,7 +94,7 @@ BUN_GLOBALS=(
 LINT_TOOLS=(
   actionlint   # GitHub Actions workflow linter
   shellcheck   # シェルスクリプト linter（この setup 自身を含む）
-  sem-cli      # Semgrep — AST パターンによるセマンティック静的解析
+  sem-cli      # sem — 関数・クラス単位の差分 / 呼び出し / 影響解析（Semgrep とは別）
   swiftformat  # Swift コードフォーマッタ（creo-id / native dev 用）
   swiftlint    # Swift linter（style + 規約チェック）
   xcbeautify   # Xcode build log pretty-printer
@@ -247,7 +247,7 @@ install_cargo() {
       # shellcheck disable=SC2086  # word splitting は意図的（複数引数渡し）
       cargo install $install_arg
     else
-      echo "  ⚠ cargo 未検出 → mise で rust toolchain を入れてから再実行"
+      echo "  ⚠ cargo 未検出 → rustup で Rust toolchain を入れてから再実行"
       echo "    手動: cargo install $install_arg"
     fi
   fi
@@ -263,7 +263,7 @@ elif [ -d "$VP_CLI_PATH" ]; then
     echo "  Installing vp from $VP_CLI_PATH..."
     cargo install --path "$VP_CLI_PATH"
   else
-    echo "  ⚠ cargo 未検出 → mise で rust toolchain 入れてから再実行"
+    echo "  ⚠ cargo 未検出 → rustup で Rust toolchain 入れてから再実行"
   fi
 else
   echo "  • vp: ~/repos/vantage-point を clone してから再実行"
@@ -279,7 +279,7 @@ elif [ -d "$FLEETSTAGE_CLI_PATH" ]; then
     echo "  Installing fsctl from $FLEETSTAGE_CLI_PATH..."
     cargo install --path "$FLEETSTAGE_CLI_PATH"
   else
-    echo "  ⚠ cargo 未検出 → mise で rust toolchain 入れてから再実行"
+    echo "  ⚠ cargo 未検出 → rustup で Rust toolchain 入れてから再実行"
   fi
 else
   echo "  • fsctl: ~/repos/fleetstage を clone してから再実行"
@@ -292,7 +292,7 @@ echo "📦 bun global packages"
 install_bun_globals "${BUN_GLOBALS[@]}"
 echo ""
 
-# --- mise: 言語ランタイム同期（SSOT = ~/.config/mise/config.toml） ---
+# --- mise: 既存宣言の同期（Rust は rustup、グローバル tools は追加しない） ---
 echo "🛠  mise install（言語ランタイム同期）"
 if command -v mise &>/dev/null; then
   if [ -f "$HOME/.config/mise/config.toml" ]; then

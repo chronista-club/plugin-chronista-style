@@ -118,3 +118,7 @@ mise run package                  # 配布 ZIP を dist/ に
 - [Claude Code plugins](https://code.claude.com/docs/en/plugins)
 - [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+
+## 開発 CLI の運用
+
+sem の調査・レビューと mbx の Cargo キャッシュ確認は [guide 02](02-cli-tools.md) を参照。

@@ -2,7 +2,7 @@
 name: chronista-style
 description: Chronista として活動するスキルセットの入口。North Star・設計哲学・基本姿勢・プロジェクト管理の規約を定義し、各スキルへ routing する。
 metadata:
-  version: "6.1.4"
+  version: "6.1.5"
   tags: "chronista, development, workflow, memory"
 ---
 
@@ -240,3 +240,7 @@ slug のルール:
 ## リファレンス
 
 - [設計の判断集 — 気づく問いと、直し続ける作法](reference/design-judgments.md)
+
+## 開発 CLI の確認
+
+sem / mbx を使う場面では [guide 02](../../docs/guide/02-cli-tools.md) を参照。実行環境の help と Cargo の経路を確認し、利用のためだけにグローバル設定を変更しない。
