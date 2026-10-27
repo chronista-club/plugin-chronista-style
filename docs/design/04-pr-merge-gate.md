@@ -1,6 +1,6 @@
 # 04. PR のマージ判断
 
-> **Status**: Draft
+> **Status**: Active
 > **Related**: `mem_1CgSP2SsXR9mr8LhAfydpG`（起票と裁定）
 > **対象**: `skills/codeflow/SKILL.md`
 
@@ -34,3 +34,4 @@ team-b の現行の quick レビューは `COMMIT READY / NEEDS WORK / BLOCKED` 
 ## Status log
 
 - 2026-10-27: マージ条件をユーザー GO または team-b のマージ可判断に変更。判定表記には依存しない。未リリース。
+- 2026-10-27: v0.35.0 に codeflow 4.4.0 として収録。
