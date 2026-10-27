@@ -3,7 +3,7 @@ name: codeflow
 description: Spark（想起）から Conception（構想）を経て GO で作業に切り替え、SDG で仕様・設計を記録する開発フロー
 metadata:
   tags: "development, workflow, sdg, spark, conception, second-opinion"
-  version: "4.3.3"
+  version: "4.4.0"
 ---
 
 # Code Flow Skill
@@ -64,7 +64,20 @@ spec / design を Draft で `docs/` に置く（何を書くか・どう生か�
 
 ### Branch & PR（ブランチ & PR フロー）
 
-trunk は `nightly`、ブランチ名は `<段>/<slug>`（`spike/` → `wip/` → `review/`、段は `git next` で進める）、PR body 冒頭に memory ID。規約の本体は `chronista-style` ルートの「ブランチ運用（nightly trunk）」と「Branch slug の規約」、操作は `branch-step`。PR を出す前に `verification` を通す（設計に触れた変更なら design が同じ PR にあること、もそこで確かめる）。レビューで GO が出るまでマージしない。
+trunk は `nightly`、ブランチ名は `<段>/<slug>`（`spike/` → `wip/` → `review/`、段は `git next` で進める）、PR body 冒頭に memory ID。規約の本体は `chronista-style` ルートの「ブランチ運用（nightly trunk）」と「Branch slug の規約」、操作は `branch-step`。PR を出す前に `verification` を通す（設計に触れた変更なら design が同じ PR にあること、もそこで確かめる）。
+
+#### PR のマージ条件
+
+`verification` とプロジェクトの必須チェックを満たしたうえで、次の **いずれか** があればメインセッションが PR をマージする。
+
+- **ユーザーの GO** — 対象 PR のマージを承認している。
+- **team-bucciarati のレビューでマージ可** — 対象差分のコードレビューの結論が「マージしてよい」である。
+
+team-b の判定は固定の文字列ではなく、レビュー対象・結論・未解決の指摘で読む。`COMMIT READY` / `PASS` なども、そのレビューで必要な確認が済み、マージを妨げる残件がなければこの条件を満たす。条件付きの OK は、条件の解消を確認してから扱う。
+
+どちらかを満たせば、追加のユーザー GO を求めずマージまで進める。team-b はレビューを担い、マージ操作はメインセッションが行う。マージ直前に PR の HEAD と必須チェックを確認し、承認・レビュー後に差分が変わっていれば、更新差分へのユーザー GO または再レビューで条件を満たし直す。
+
+実装開始の GO は別の合意であり、それだけでマージ承認とは扱わない。ユーザーが「まだマージしない」など明示的に保留している場合は、その解除を待つ。
 
 ### Implementation（実装・TDD）
 
