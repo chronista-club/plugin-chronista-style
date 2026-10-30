@@ -1,12 +1,21 @@
-"""Run with python3 -m unittest discover -s tests -v. No external services."""
+"""Run with python3 -m unittest discover -s tests -v. No external services.
+
+hooks は Ruby（system ruby 2.6 でも動く書き方）。振る舞いは fail-open、報告は黙らない:
+- session-start: 常に exit 0 + JSON。出せる context は出し、失敗は systemMessage で知らせる
+- fabrication-tripwire: 判定できないときは block せず、exit 1 + stderr 一行で知らせる
+
+別の ruby で確かめるときは HOOKS_RUBY=/usr/bin/ruby を付ける。
+"""
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+RUBY = shutil.which(os.environ.get("HOOKS_RUBY", "ruby")) or "ruby"
 
 
 def claude(role, content):
@@ -18,22 +27,37 @@ def codex(kind, **fields):
 
 
 class HooksTest(unittest.TestCase):
-    def run_hook(self, name, payload, **kwargs):
-        result = subprocess.run(
-            ["bash", str(ROOT / "hooks" / name)],
-            input=json.dumps(payload), text=True, capture_output=True,
-            timeout=10, **kwargs,
+    def run_raw(self, name, stdin, **kwargs):
+        return subprocess.run(
+            [RUBY, str(ROOT / "hooks" / name)],
+            input=stdin, text=True, capture_output=True, timeout=10, **kwargs,
         )
+
+    def run_hook(self, name, payload, **kwargs):
+        result = self.run_raw(name, json.dumps(payload), **kwargs)
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout) if result.stdout.strip() else {}
 
+    def assert_skipped_loudly(self, result):
+        # block しない（stdout 無し）が、黙らない（exit 1、stderr の先頭行は hook 名から）
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.strip(), "")
+        self.assertTrue(result.stderr.startswith("chronista-style fabrication-tripwire:"), result.stderr)
+
+    def write_transcript(self, directory, records):
+        path = Path(directory) / "transcript.jsonl"
+        path.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+        return str(path)
+
     def stop(self, records, **fields):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "transcript.jsonl"
-            path.write_text("\n".join(json.dumps(r) for r in records) + "\n")
-            return self.run_hook("fabrication-tripwire.sh", {
-                "transcript_path": str(path), **fields,
-            })
+            path = self.write_transcript(directory, records)
+            return self.run_hook("fabrication_tripwire.rb", {"transcript_path": path, **fields})
+
+    def stop_raw(self, records, **fields):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_transcript(directory, records)
+            return self.run_raw("fabrication_tripwire.rb", json.dumps({"transcript_path": path, **fields}))
 
     def transcripts(self, evidence=None, final="test result: ok", kind="custom_tool_call_output"):
         c = [claude("user", "test please")]
@@ -97,20 +121,24 @@ class HooksTest(unittest.TestCase):
         for records in self.transcripts():
             self.assertNotEqual(self.stop(records, stop_hook_active=True).get("decision"), "block")
 
-    def test_unknown_and_broken_transcripts_fail_open(self):
-        self.assertEqual(self.stop([{"type": "future_format", "output": "unknown"}], last_assistant_message="test result: ok"), {})
-        self.assertEqual(self.run_hook("fabrication-tripwire.sh", {"transcript_path": "/missing"}), {})
+    def test_unknown_and_broken_transcripts_skip_loudly(self):
+        # 判定できないときは block しない。ただし黙らない
+        self.assert_skipped_loudly(self.stop_raw([{"type": "future_format", "output": "unknown"}],
+                                                 last_assistant_message="test result: ok"))
+        self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({"transcript_path": "/missing"})))
+        self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({})))
+        self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", "{broken"))
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "broken.jsonl"
             path.write_text(json.dumps(self.transcripts()[1][0]) + "\n{broken")
-            self.assertEqual(self.run_hook("fabrication-tripwire.sh", {
+            self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({
                 "transcript_path": str(path), "last_assistant_message": "test result: ok",
-            }), {})
+            })))
 
     def test_unknown_output_shape_is_not_missing_evidence(self):
         records = self.transcripts()[1]
         records.insert(1, codex("custom_tool_call_output", output=[{"type": "future_text", "value": "test result: ok"}]))
-        self.assertEqual(self.stop(records), {})
+        self.assert_skipped_loudly(self.stop_raw(records))
 
     def test_claude_feedback_and_final_rewrite(self):
         records = self.transcripts("test result: ok")[0]
@@ -121,7 +149,7 @@ class HooksTest(unittest.TestCase):
     def test_session_legacy_environment_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, CLAUDE_PROJECT_DIR=directory)
-            result = self.run_hook("session-start.sh", {}, env=env)
+            result = self.run_hook("session_start.rb", {}, env=env)
             self.assertIn(Path(directory).name, result["hookSpecificOutput"]["additionalContext"])
 
     def test_session_git_context_comes_from_requested_repo(self):
@@ -129,25 +157,54 @@ class HooksTest(unittest.TestCase):
             subprocess.run(["git", "init", "-q", directory], check=True)
             subprocess.run(["git", "-C", directory, "symbolic-ref", "HEAD", "refs/heads/hook-test"], check=True)
             subprocess.run(["git", "-C", directory, "remote", "add", "origin", "git@example.test:org/plugin-atlas.git"], check=True)
-            result = self.run_hook("session-start.sh", {"cwd": directory}, cwd=ROOT)
+            result = self.run_hook("session_start.rb", {"cwd": directory}, cwd=ROOT)
             context = result["hookSpecificOutput"]["additionalContext"]
             self.assertIn("hook-test", context)
             self.assertIn("remote 由来: `atlas`", context)
+            self.assertNotIn("systemMessage", result)
 
     def test_session_cwd_precedes_environment(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory) / 'codex-plugin-project "日本語"'
             project.mkdir()
             env = dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT))
-            result = self.run_hook("session-start.sh", {"cwd": str(project)}, env=env, cwd=ROOT)
+            result = self.run_hook("session_start.rb", {"cwd": str(project)}, env=env, cwd=ROOT)
             context = result["hookSpecificOutput"]["additionalContext"]
             self.assertIn(project.name, context)
             self.assertIn('project "日本語"', context)
-            self.assertNotIn("自動注入される。", context)
+            # git リポジトリでないのは異常ではない。警告を出さない
+            self.assertIn("Branch: `-`", context)
+            self.assertNotIn("systemMessage", result)
 
-    def test_invalid_cwd_never_reports_other_repo(self):
-        result = self.run_hook("session-start.sh", {"cwd": "/missing/chronista-project"}, cwd=ROOT)
-        self.assertEqual(result, {})
+    def test_session_invalid_cwd_warns_and_never_reports_other_repo(self):
+        result = self.run_hook("session_start.rb", {"cwd": "/missing/chronista-project"}, cwd=ROOT)
+        self.assertNotIn("hookSpecificOutput", result)
+        self.assertTrue(result["systemMessage"].startswith("chronista-style session-start:"), result)
+        self.assertIn("/missing/chronista-project", result["systemMessage"])
+
+    def test_session_broken_stdin_warns_but_still_injects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(os.environ, CLAUDE_PROJECT_DIR=directory)
+            result = self.run_raw("session_start.rb", "{broken", env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            out = json.loads(result.stdout)
+            self.assertIn(Path(directory).name, out["hookSpecificOutput"]["additionalContext"])
+            self.assertTrue(out["systemMessage"].startswith("chronista-style session-start:"), out)
+
+    def test_session_missing_git_warns_but_still_injects(self):
+        # PATH から git を消す。ruby は絶対パスで起動しているが、macOS の system ruby は起動時に uname を呼ぶので残す
+        with tempfile.TemporaryDirectory() as directory:
+            bin_dir = Path(directory) / "bin"
+            bin_dir.mkdir()
+            uname = shutil.which("uname")
+            if uname:
+                (bin_dir / "uname").symlink_to(uname)
+            env = dict(os.environ, PATH=str(bin_dir))
+            result = self.run_raw("session_start.rb", json.dumps({"cwd": directory}), env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            out = json.loads(result.stdout)
+            self.assertIn(Path(directory).name, out["hookSpecificOutput"]["additionalContext"])
+            self.assertIn("git", out["systemMessage"])
 
 
 if __name__ == "__main__":
