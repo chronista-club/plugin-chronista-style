@@ -39,10 +39,12 @@ class HooksTest(unittest.TestCase):
         return json.loads(result.stdout) if result.stdout.strip() else {}
 
     def assert_skipped_loudly(self, result):
-        # block しない（stdout 無し）が、黙らない（exit 1、stderr の先頭行は hook 名から）
+        # block しない（stdout 無し）が、黙らない（exit 1、stderr は一行で hook 名から始まる）
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual(result.stdout.strip(), "")
         self.assertTrue(result.stderr.startswith("chronista-style fabrication-tripwire:"), result.stderr)
+        self.assertEqual(len(result.stderr.strip().splitlines()), 1, result.stderr)
+        self.assertLess(len(result.stderr), 300, result.stderr)
 
     def write_transcript(self, directory, records):
         path = Path(directory) / "transcript.jsonl"
@@ -70,6 +72,8 @@ class HooksTest(unittest.TestCase):
                        content=[{"type": "output_text", "text": final}]))
         return c, x
 
+    # --- tripwire: 判定 ---
+
     def test_unbacked_report_blocks_both_formats(self):
         for records in self.transcripts():
             with self.subTest(records=records):
@@ -93,6 +97,13 @@ class HooksTest(unittest.TestCase):
         records += self.transcripts()[1][-1:]
         self.assertEqual(self.stop(records).get("decision"), "block")
 
+    def test_tool_reference_blocks_are_known_but_not_evidence(self):
+        # ToolSearch の結果は本文を持たない tool_reference ブロック。エラーにも証拠にもしない
+        reference = [{"type": "tool_reference", "tool_name": "WebFetch"}]
+        records = [claude("user", "x"), claude("user", [{"type": "tool_result", "tool_use_id": "t1", "content": reference}])]
+        self.assertEqual(self.stop(records + [claude("assistant", [{"type": "text", "text": "ok"}])]), {})
+        self.assertEqual(self.stop(records + [claude("assistant", [{"type": "text", "text": "test result: ok"}])]).get("decision"), "block")
+
     def test_hook_final_text_takes_priority(self):
         for records in self.transcripts():
             self.assertNotEqual(self.stop(records, last_assistant_message="未検証です").get("decision"), "block")
@@ -112,8 +123,9 @@ class HooksTest(unittest.TestCase):
             self.assertNotEqual(self.stop(records).get("decision"), "block")
 
     def test_explicit_override_only(self):
-        for records in self.transcripts(final="test result: ok\nTRIPWIRE-ACK"):
-            self.assertNotEqual(self.stop(records).get("decision"), "block")
+        for final in ("test result: ok\nTRIPWIRE-ACK", "test result: ok\r\nTRIPWIRE-ACK"):
+            for records in self.transcripts(final=final):
+                self.assertNotEqual(self.stop(records).get("decision"), "block")
         for records in self.transcripts(final="test result: ok (TRIPWIRE-ACK)"):
             self.assertEqual(self.stop(records).get("decision"), "block")
 
@@ -121,16 +133,44 @@ class HooksTest(unittest.TestCase):
         for records in self.transcripts():
             self.assertNotEqual(self.stop(records, stop_hook_active=True).get("decision"), "block")
 
+    def test_claude_feedback_and_final_rewrite(self):
+        records = self.transcripts("test result: ok")[0]
+        records += [claude("user", "Stop hook feedback: retry"),
+                    claude("assistant", [{"type": "text", "text": "test result: ok"}])]
+        self.assertEqual(self.stop(records), {})
+
+    # --- tripwire: 判定できないとき ---
+
+    def test_null_transcript_path_is_quiet(self):
+        # Codex の契約では transcript_path は string | null。null は異常ではない
+        self.assertEqual(self.run_hook("fabrication_tripwire.rb", {"transcript_path": None}), {})
+
+    def test_encrypted_tool_output_is_quiet(self):
+        # Codex はツール出力を暗号化して保存することがある。読めない証拠がある間は判定しない（block も通知もしない）
+        records = self.transcripts()[1]
+        records.insert(1, codex("function_call_output", call_id="c1",
+                                output=[{"type": "encrypted_content", "encrypted_content": "gAAAA..."}]))
+        self.assertEqual(self.stop(records), {})
+
+    def test_non_object_rows_skip_loudly(self):
+        records = self.transcripts()[0]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "transcript.jsonl"
+            path.write_text("\n".join(json.dumps(r) for r in records) + '\n"a bare string row"\n')
+            self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({"transcript_path": str(path)})))
+
     def test_unknown_and_broken_transcripts_skip_loudly(self):
-        # 判定できないときは block しない。ただし黙らない
         self.assert_skipped_loudly(self.stop_raw([{"type": "future_format", "output": "unknown"}],
                                                  last_assistant_message="test result: ok"))
         self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({"transcript_path": "/missing"})))
         self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({})))
+        self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps([1, 2])))
         self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", "{broken"))
         with tempfile.TemporaryDirectory() as directory:
+            self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({"transcript_path": directory})))
             path = Path(directory) / "broken.jsonl"
-            path.write_text(json.dumps(self.transcripts()[1][0]) + "\n{broken")
+            # 壊れた行が長くても、通知に載る先頭行は一行・短い
+            path.write_text(json.dumps(self.transcripts()[1][0]) + "\n{broken" + "x" * 20000)
             self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({
                 "transcript_path": str(path), "last_assistant_message": "test result: ok",
             })))
@@ -140,17 +180,19 @@ class HooksTest(unittest.TestCase):
         records.insert(1, codex("custom_tool_call_output", output=[{"type": "future_text", "value": "test result: ok"}]))
         self.assert_skipped_loudly(self.stop_raw(records))
 
-    def test_claude_feedback_and_final_rewrite(self):
-        records = self.transcripts("test result: ok")[0]
-        records += [claude("user", "Stop hook feedback: retry"),
-                    claude("assistant", [{"type": "text", "text": "test result: ok"}])]
-        self.assertEqual(self.stop(records), {})
+    # --- session-start ---
 
     def test_session_legacy_environment_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, CLAUDE_PROJECT_DIR=directory)
             result = self.run_hook("session_start.rb", {}, env=env)
             self.assertIn(Path(directory).name, result["hookSpecificOutput"]["additionalContext"])
+
+    def test_session_empty_environment_is_unset(self):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR="")
+        result = self.run_hook("session_start.rb", {}, env=env, cwd=ROOT)
+        self.assertIn(f"Project dir: `{ROOT.name}`", result["hookSpecificOutput"]["additionalContext"])
+        self.assertNotIn("systemMessage", result)
 
     def test_session_git_context_comes_from_requested_repo(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -176,20 +218,33 @@ class HooksTest(unittest.TestCase):
             self.assertIn("Branch: `-`", context)
             self.assertNotIn("systemMessage", result)
 
-    def test_session_invalid_cwd_warns_and_never_reports_other_repo(self):
+    def test_session_non_utf8_locale_keeps_japanese_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "日本語"
+            project.mkdir()
+            env = dict(os.environ, CLAUDE_PROJECT_DIR=str(project), LANG="C", LC_ALL="C")
+            result = self.run_hook("session_start.rb", {}, env=env, cwd=ROOT)
+            self.assertIn("Project dir: `日本語`", result["hookSpecificOutput"]["additionalContext"])
+            self.assertNotIn("systemMessage", result)
+
+    def test_session_invalid_cwd_warns_and_keeps_static_context(self):
         result = self.run_hook("session_start.rb", {"cwd": "/missing/chronista-project"}, cwd=ROOT)
-        self.assertNotIn("hookSpecificOutput", result)
+        context = result["hookSpecificOutput"]["additionalContext"]
+        self.assertNotIn("Project dir:", context)
+        self.assertNotIn(ROOT.name, context)
+        self.assertIn("規律エッセンス", context)
         self.assertTrue(result["systemMessage"].startswith("chronista-style session-start:"), result)
         self.assertIn("/missing/chronista-project", result["systemMessage"])
 
     def test_session_broken_stdin_warns_but_still_injects(self):
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, CLAUDE_PROJECT_DIR=directory)
-            result = self.run_raw("session_start.rb", "{broken", env=env)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            out = json.loads(result.stdout)
-            self.assertIn(Path(directory).name, out["hookSpecificOutput"]["additionalContext"])
-            self.assertTrue(out["systemMessage"].startswith("chronista-style session-start:"), out)
+            for stdin in ("{broken", "[1, 2]", '{"cwd": "\xff"}'):
+                result = self.run_raw("session_start.rb", stdin, env=env, errors="surrogateescape")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                out = json.loads(result.stdout)
+                self.assertIn("規律エッセンス", out["hookSpecificOutput"]["additionalContext"])
+                self.assertTrue(out["systemMessage"].startswith("chronista-style session-start:"), out)
 
     def test_session_missing_git_warns_but_still_injects(self):
         # PATH から git を消す。ruby は絶対パスで起動しているが、macOS の system ruby は起動時に uname を呼ぶので残す

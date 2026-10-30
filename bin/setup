@@ -332,7 +332,7 @@ echo ""
 
 # Codex の MCP は .mcp.json から自動コピーしない。
 echo "  • Codex のプラグイン・MCP 接続: docs/guide/01-installation.md を参照"
-echo "  • hooks の実行には bash / git / jq / python3 が必要"
+echo "  • hooks の実行には ruby（2.6 以上）と git が必要"
 echo ""
 
 # --- 認証確認 / 残作業 ---
