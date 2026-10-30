@@ -31,7 +31,7 @@ for f in bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*; do
   bash -n "$f" || rc=1
 done
 for f in hooks/*.rb; do
-  ruby -c "$f" >/dev/null || rc=1
+  ruby -wc "$f" >/dev/null || rc=1
 done
 exit $rc
 """

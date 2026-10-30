@@ -149,10 +149,13 @@ def main
   output["systemMessage"] = "#{HOOK}: #{warnings.join('。')}" unless warnings.empty?
   puts JSON.generate(output)
 rescue StandardError => e
-  # ここまで来るのは想定外。セッションは止めず、何がコケたかだけ知らせる
+  # ここまで来るのは想定外。セッションは止めず、プロジェクトに依らない部分だけ出して、何がコケたかを知らせる
   message = "#{HOOK}: #{e.class}: #{first_line(e.message)}"
   warn message
-  puts JSON.generate("systemMessage" => message)
+  puts JSON.generate(
+    "hookSpecificOutput" => { "hookEventName" => "SessionStart", "additionalContext" => context(nil, nil) },
+    "systemMessage" => message,
+  )
 end
 
 main

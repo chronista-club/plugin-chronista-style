@@ -123,7 +123,9 @@ class HooksTest(unittest.TestCase):
             self.assertNotEqual(self.stop(records).get("decision"), "block")
 
     def test_explicit_override_only(self):
-        for final in ("test result: ok\nTRIPWIRE-ACK", "test result: ok\r\nTRIPWIRE-ACK"):
+        # 行の区切りは \n だけでなく \r\n / \r / U+2028 も（旧 Python の splitlines と同じ）
+        for final in ("test result: ok\nTRIPWIRE-ACK", "test result: ok\r\nTRIPWIRE-ACK",
+                      "test result: ok\rTRIPWIRE-ACK", "test result: ok TRIPWIRE-ACK"):
             for records in self.transcripts(final=final):
                 self.assertNotEqual(self.stop(records).get("decision"), "block")
         for records in self.transcripts(final="test result: ok (TRIPWIRE-ACK)"):
@@ -151,6 +153,23 @@ class HooksTest(unittest.TestCase):
         records.insert(1, codex("function_call_output", call_id="c1",
                                 output=[{"type": "encrypted_content", "encrypted_content": "gAAAA..."}]))
         self.assertEqual(self.stop(records), {})
+
+    def test_anomaly_after_encrypted_output_still_skips_loudly(self):
+        # 読めない証拠があっても最後まで読む。その後ろの未知ブロックは黙らせない（順序に依らず知らせる）
+        encrypted = codex("function_call_output", call_id="c1",
+                          output=[{"type": "encrypted_content", "encrypted_content": "gAAAA..."}])
+        unknown = codex("custom_tool_call_output", call_id="c2", output=[{"type": "future_text", "value": "x"}])
+        final = self.transcripts()[1][-1]
+        self.assert_skipped_loudly(self.stop_raw([encrypted, unknown, final]))
+        self.assert_skipped_loudly(self.stop_raw([unknown, encrypted, final]))
+
+    def test_warnings_do_not_pollute_the_notice(self):
+        # -w で動かしても、通知に載る先頭行は hook 名から始まり、stdout の JSON は壊れない
+        env = dict(os.environ, RUBYOPT="-w")
+        self.assert_skipped_loudly(self.run_raw("fabrication_tripwire.rb", json.dumps({}), env=env))
+        result = self.run_raw("session_start.rb", json.dumps({"cwd": str(ROOT)}), env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("hookSpecificOutput", json.loads(result.stdout))
 
     def test_non_object_rows_skip_loudly(self):
         records = self.transcripts()[0]
@@ -239,7 +258,8 @@ class HooksTest(unittest.TestCase):
     def test_session_broken_stdin_warns_but_still_injects(self):
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, CLAUDE_PROJECT_DIR=directory)
-            for stdin in ("{broken", "[1, 2]", '{"cwd": "\xff"}'):
+            # "\udcff" は surrogateescape で生の 0xFF になる（"\xff" と書くと ÿ の妥当な UTF-8 が送られてしまう）
+            for stdin in ("{broken", "[1, 2]", '{"cwd": "\udcff"}'):
                 result = self.run_raw("session_start.rb", stdin, env=env, errors="surrogateescape")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 out = json.loads(result.stdout)

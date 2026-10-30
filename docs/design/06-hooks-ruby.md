@@ -37,8 +37,10 @@ tripwire の内部エラーに systemMessage を使わないのは、Stop での
 - 違反なし、`stop_hook_active` の再入、`TRIPWIRE-ACK`
 - cwd が git リポジトリでない（Branch 等は `-`）
 - Codex の `transcript_path: null`（契約上 `string | null`。無ければ検査できない）
-- Codex が暗号化して保存したツール出力（`function_call_output.output` の `encrypted_content` ブロック）。読めない証拠がある間は判定しない — 「本文なし」扱いにすると、ツールを使っていても証拠が無いと見なして誤 block する
-- 本文を持たない正規のブロック（ToolSearch の `tool_reference`）は既知型として読み飛ばす。実データで Claude の 36% のセッションに含まれ、未知のままだと Stop のたびに hook error が出る（Moody Blues レビューの指摘）
+- Codex が暗号化して保存したツール出力（`function_call_output.output` の `encrypted_content` ブロック）。読めない証拠がある間は判定しない — 「本文なし」扱いにすると、ツールを使っていても証拠が無いと見なして誤 block する。ただし **最後まで読み切って形式の検査を済ませてから** 判定を諦める。読めない証拠の後ろにある未知ブロックや壊れた行を黙らせない
+- 本文を持たない正規のブロック（ToolSearch の `tool_reference`）は既知型として読み飛ばす。実データでは subagent を含む transcript 361 本中 131 本、Stop が読むメインセッションだけなら 77% に含まれ、未知のままだと Stop のたびに hook error が出る（Moody Blues レビューの指摘）
+
+採らなかった案: 読める証拠だけで先に判定し、違反があって読めない証拠もあるときだけ「判定できない」と知らせる（exit 1）。今の実データでは通知 0 件で、出たときには意味のある通知になる。暗号化出力を含む Codex セッションで報告のたびに通知が出る可能性と引き換えなので、必要になったら切り替える。
 
 逆に、知らない型のブロック・オブジェクトでない行・読めないファイルは「異常」として exit 1 で知らせる。新しい型が出てきたら、本文を持つかどうかを確かめて既知型に足す。
 
@@ -62,3 +64,4 @@ tripwire の内部エラーに systemMessage を使わないのは、Stop での
 
 - 2026-10-30: Conception（mako「hooks を ruby に統一して、コケたらきちんとエラー」「ruby じゃなくても。sh は読みづらい、python は得意じゃない」→ Ruby を提案）、GO。`wip/hooks-ruby`。
 - 2026-10-30: Moody Blues レビュー（PR #10、NEEDS WORK）。実 transcript 391 本で旧新の判定は全件一致したが、`tool_reference` を未知型として拒否するため Stop のたびに hook error が出ることを指摘。既知型に追加、Codex の暗号化ツール出力と `transcript_path: null` は静かに通す、session-start は cwd が無くても規律エッセンスを出す、LANG=C の日本語パス、stderr の長さ上限、macOS system ruby の CI ジョブ、verification / bin/setup / design 01 の古い記述を直した。
+- 2026-10-31: Moody Blues 再検証（NEEDS WORK、残りは小さい）。暗号化出力で読むのを止めると後ろの異常が黙る → 最後まで読んでから `OpaqueEvidence`。変異テスト 17 個で守られていなかった修正にテストを足した（生の 0xFF、`\r` / U+2028 の ACK、`RUBYOPT=-w`）。想定外の例外でも規律エッセンスは出す。lint は `ruby -wc` に統一。
