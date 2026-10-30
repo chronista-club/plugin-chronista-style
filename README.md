@@ -57,9 +57,9 @@ Spark（想起、どちらからでも）→ Conception（構想: 調べる・�
 ## hooks
 
 - **SessionStart**: git コンテキストと Atlas 候補、規律エッセンスを注入
-- **Stop**: `fabrication-tripwire.sh` — 観測していないツール出力を最終メッセージに書いたら差し戻す（fail-open、同一ターンの差し戻しは一回まで）
+- **Stop**: `fabrication_tripwire.rb` — 観測していないツール出力を最終メッセージに書いたら差し戻す（fail-open、同一ターンの差し戻しは一回まで）
 
-hooks は bash / git / jq / Python 3 が必要。Codex では hook 定義の信頼設定も必要。
+hooks は ruby（2.6 以上。macOS の system ruby でよい）と git が必要。失敗してもセッションは止めないが黙らない — session-start は `systemMessage`、tripwire は hook error 通知で知らせる（design 06）。Codex では hook 定義の信頼設定も必要。
 
 ## 関連プラグイン
 

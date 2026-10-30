@@ -1,5 +1,5 @@
 {
-  "description": "chronista-style hooks: SessionStart (project context) and Stop (fabrication tripwire — block reporting tool results with no matching tool_result anywhere in this session)",
+  "description": "chronista-style hooks (Ruby, fail-open but never silent): SessionStart (project context) and Stop (fabrication tripwire — block reporting tool results with no matching tool_result anywhere in this session)",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "command": "ruby \"${CLAUDE_PLUGIN_ROOT}/hooks/session_start.rb\"",
             "timeout": 10
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/fabrication-tripwire.sh\"",
+            "command": "ruby \"${CLAUDE_PLUGIN_ROOT}/hooks/fabrication_tripwire.rb\"",
             "timeout": 10
           }
         ]

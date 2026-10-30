@@ -19,6 +19,8 @@
 - codeflow / branch-step / chronista-style: slug が不変なのは `wip/` 以降に。`spike/` の名前は仮で、GO で `wip/` にするとき実装内容と合わなければ適切な slug に付け替える（`git branch -m spike/<old> wip/<new>`。アクションの Meta もこの時点で決める）。script は未変更。design 02 の Status log に裁定。
 - codeflow: 流れを `Spark → Conception → GO → Spec → Design → Implementation → Guide → PR → Release（条件付き）→ Learning` に。「Branch & PR」を割り、ブランチは GO の瞬間に（アクションの起票と同時）、PR は Implementation の後に。SDG を Spec / Design / Guide に分け、guide は動いたものを見てから書く。アクションを閉じる・design を Active にするのは Release ではなく PR のマージ時（Release は Status log にバージョン一行）。Conception に spike、Implementation に「1 振る舞い 1 単位」と「範囲外は spark」。spec-design-guide の対応表、README、root の流れを揃え、design 05 を追加。
 - 語彙: 「段」（spike / wip / review）を **ステージ** と呼ぶ。記法は `<stage>/<slug>`。branch-step（SKILL・script の利用者向けメッセージ・テスト文言）、chronista-style、parallel-dev、README、design 02 を揃えた。script の動作は変えていない。
+- hooks: bash 2 本 + Python 2 本を **Ruby** 3 本（`session_start.rb` / `fabrication_tripwire.rb` / `transcript.rb`）に統一。`hooks.json` は `ruby` を直接呼び、jq と python3 の依存が消える（要件は ruby 2.6 以上と git）。振る舞いは fail-open のまま、失敗を黙らせない — session-start は出せる context を出して `systemMessage` で知らせ、tripwire は判定できないとき exit 1 + stderr で知らせる（block しない）。テストは cwd 不正・stdin 壊れ・transcript 欠損・git 無しを検査。lint に `ruby -wc`、CI に setup-ruby と macOS system ruby（2.6）のジョブ。design 06。
+- hooks（Moody Blues レビュー対応）: ToolSearch の `tool_reference` ブロックを既知型に（旧実装は黙って tripwire を無効化、新実装のままなら Stop ごとに hook error）。Codex の暗号化ツール出力と `transcript_path: null` は判定せず静かに通す。session-start は cwd が無くても規律エッセンスを出し、LANG=C の日本語パスで落ちない。verification スキル・`bin/setup`・design 01 の「bash / jq / Python 3」の記述を更新。
 
 ## [0.35.0] - 2026-10-27
 

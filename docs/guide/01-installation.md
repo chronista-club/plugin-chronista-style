@@ -12,7 +12,7 @@
 
 ## 前提
 
-Claude Code または Codex のプラグイン対応環境を使う。hooks には bash、git、jq、Python 3 が必要。Windows では Git Bash 上でこれらが PATH にあることを確認する。hooks を有効にしない場合もスキルは利用できるが、起動時の情報注入と Stop の検査は行われない。
+Claude Code または Codex のプラグイン対応環境を使う。hooks には ruby（2.6 以上。macOS の system ruby でよい）と git が必要。Windows では Git Bash 上で `ruby`（RubyInstaller 等）と `git` が PATH にあることを確認する。hooks を有効にしない場合もスキルは利用できるが、起動時の情報注入と Stop の検査は行われない。
 
 ## Claude Code
 
