@@ -1,6 +1,6 @@
 ---
 name: release
-description: リリースの背骨 — 版の検出・CHANGELOG・release commit・nightly → main・tag・GitHub Release。尻尾（CI / publish / 署名 / 配置）はプロジェクト側に委譲
+description: リリースの共通手順 — バージョンの検出・CHANGELOG・release commit・nightly → main・tag・GitHub Release。後工程（CI / publish / 署名 / 配置）はプロジェクト側に委譲
 metadata:
   version: "1.0.3"
 ---
@@ -9,33 +9,33 @@ metadata:
 
 記憶操作の前に [creo-memories の接続と未接続時の扱い](../chronista-style/reference/memory-connection.md) を読む。以下の記憶手順は、対応ツールが利用できる場合に実行する。
 
-リリースの**背骨**だけを担う。tag や main への push の**後に起きること**（CI、image、publish、署名、配置）は**尻尾**としてプロジェクト側に委譲する。背骨は全プロジェクト共通、尻尾は全部違う。
+リリースの**共通手順**だけを担う。tag や main への push の**後に起きること**（CI、image、publish、署名、配置）は**後工程**としてプロジェクト側に委譲する。共通手順は全プロジェクトで同じ、後工程はプロジェクトごとに違う。
 
-## 背骨
+## 共通手順
 
 ### 1. 現在地と形式を読む
 
 聞かずに全部読む。
 
-- **版の正本**: `.claude-plugin/plugin.json` / `.codex-plugin/plugin.json`（プラグイン。両方あればリポジトリの同期規約を読み、同じ版を維持）/ `Cargo.toml`（`workspace.package.version` か `package.version`）/ `package.json`（monorepo なら package ごと）/ Swift アプリは tag が正本（`git describe --tags` で読む設計なら、tag を打つこと自体が版付け）
+- **バージョンの正本**: `.claude-plugin/plugin.json` / `.codex-plugin/plugin.json`（プラグイン。両方あればリポジトリの同期規約を読み、同じバージョンを維持）/ `Cargo.toml`（`workspace.package.version` か `package.version`）/ `package.json`（monorepo なら package ごと）/ Swift アプリは tag が正本（`git describe --tags` で読む設計なら、tag を打つこと自体がバージョン付け）
 - **trunk モデル**: `nightly` ブランチがあり今そこにいるなら **nightly モデル**（nightly → main を merge して main で tag）。無ければ **main モデル**（今のブランチで tag）
 - **前提**: working tree が clean、trunk の最新（`git pull`）。満たさなければ止まって報告
 - **前提（worktree）**: `git worktree list --porcelain` で、trunk と main を**どの worktree が checkout しているか**を見る。**今いる worktree が trunk を持っていなければ止まる** — 「release は trunk を checkout している worktree（lead）で行う」と案内して終える。lane（linked worktree）から trunk を動かそうとすると、lead が持つブランチの checkout を git が拒む（二重 checkout）。詰まった時に **`core.bare` を触る / `--ignore-other-worktrees` / `--force` / `git worktree remove` を回避に使わない**（共有 config の `core.bare = true` は lead の作業ツリーを取り残し、status / diff / pull が全部壊れる）。lane から trunk を動かす慣習そのものを止める
 - **直前のリリース**: `git tag --sort=-creatordate | head -1`、差分は `git log <tag>..HEAD --oneline`。release commit の流儀も直前のものに合わせる（`release: vX.Y.Z — 要約` が既定。`chore(release): X.Y.Z — 要約` の流儀ならそれに）
-- **CI の起点**: `.github/workflows/*.yml` の `on:` を読む。`tags: ['v*']` があれば tag の push が尻尾を起動する。`branches: [main]` で tag を打つ workflow（`release-tag.yml` 等）があれば **自分では tag を打たない**
-- **尻尾の有無**: 下記「尻尾の検出」
+- **CI の起点**: `.github/workflows/*.yml` の `on:` を読む。`tags: ['v*']` があれば tag の push が後工程を起動する。`branches: [main]` で tag を打つ workflow（`release-tag.yml` 等）があれば **自分では tag を打たない**
+- **後工程の有無**: 下記「後工程の検出」
 
-### 2. 版を決め、一度だけ確認する
+### 2. バージョンを決め、一度だけ確認する
 
-- 呼び出し時にユーザーが指定した版があればそれ。無ければ差分 commit から semver を提案 — `feat:` → MINOR、`fix:` / `chore:` のみ → PATCH、`BREAKING` / `!:` → MAJOR。pre-release（`-alpha` / `-beta` / `-rc`）も可
+- 呼び出し時にユーザーが指定したバージョンがあればそれ。無ければ差分 commit から semver を提案 — `feat:` → MINOR、`fix:` / `chore:` のみ → PATCH、`BREAKING` / `!:` → MAJOR。pre-release（`-alpha` / `-beta` / `-rc`）も可
 - プラグイン形式なら、`git diff <tag>..HEAD --name-only -- 'skills/*/SKILL.md'` で変更のあったスキルを列挙し、frontmatter の `metadata.version`（旧形式では `version`） が上がっていないものを patch bump の提案に含める
-- **確認は 1 回**。提案版、変更スキル、release commit の文言、nightly → main の merge と push、tag、GitHub Release、起動される CI と尻尾 — この全部を一つの提示にまとめて GO をもらう。GO の後は最後まで聞かない
+- **確認は 1 回**。提案するバージョン、変更スキル、release commit の文言、nightly → main の merge と push、tag、GitHub Release、起動される CI と後工程 — この全部を一つの提示にまとめて GO をもらう。GO の後は最後まで聞かない
 
 ### 3. 書く
 
 - **CHANGELOG**: `CHANGELOG.md` があれば `[Unreleased]` を `[X.Y.Z] - YYYY-MM-DD` に切り替え、新しい空の `[Unreleased]` を上に置く。**無ければ作らない** — プロジェクトが持たない流儀に押し付けない。その場合は GitHub Release の notes に差分 commit の要約を書く
-- **版の書き換え**: 正本のファイル。Rust なら `Cargo.lock` も追随させる（`cargo update -w` か build）。プラグインなら変更スキルの `metadata.version`（旧形式では `version`） も
-- **両環境対応プラグイン**: `scripts/sync-manifests.py` があれば実行し、`scripts/validate.py` と hook テストを通す。公開版にはローカル用の `+codex.*` cachebuster を含めない。
+- **バージョンの書き換え**: 正本のファイル。Rust なら `Cargo.lock` も追随させる（`cargo update -w` か build）。プラグインなら変更スキルの `metadata.version`（旧形式では `version`） も
+- **リリース前の検証**: リポジトリが定める同期・検証（manifest の同期、validate、テスト等）があれば、release commit の前に通す。失敗したら止まって報告
 - **release commit**: `release: vX.Y.Z — <主要変更の 1 行要約>`（流儀が違えば合わせる）
 
 ### 4. main に載せて tag を打つ
@@ -83,9 +83,9 @@ CHANGELOG が無ければ `--generate-notes`。pre-release なら `--prerelease`
 
 push で CI が起動する形式なら `gh run list --limit 3` で起動を確認し、結果を待つ必要があるもの（image、publish）は `gh run watch` で見届けて報告する。
 
-### 6. 尻尾へ委譲する
+### 6. 後工程へ委譲する
 
-**尻尾の検出**（順に探し、最初に見つかったものを使う）:
+**後工程の検出**（順に探し、最初に見つかったものを使う）:
 
 1. `mise tasks` に `release` があれば `mise run release`
 2. `scripts/release*` があればそれ
@@ -95,26 +95,26 @@ push で CI が起動する形式なら `gh run list --limit 3` で起動を確�
 
 見つからなければ、「push が起動した CI」と「手で残っていること」を報告して終わる。
 
-**プラグイン形式の尻尾**: marketplace の source / ref / version を確認し、pin されていれば配布先の規約に従って更新する。Claude Code は `claude plugin update <name>@<marketplace>` 後に再起動。Codex は実際に登録された配布先から `codex plugin add <name>@<marketplace>` で再インストールし、新しいスレッドで確認する。ローカル開発の cachebuster は配布用コピーだけに付ける。本リポジトリの具体的な手順は [インストールと更新](../../docs/guide/01-installation.md) を参照。
+**プラグイン形式の後工程**: marketplace の source / ref / version を確認し、pin されていれば配布先の規約に従って更新する。Claude Code は `claude plugin update <name>@<marketplace>` 後に再起動。Codex は実際に登録された配布先から `codex plugin add <name>@<marketplace>` で再インストールし、新しいスレッドで確認する。ローカル開発の cachebuster（`+codex.*`）は配布用コピーだけに付け、公開ソースのバージョンには含めない。本リポジトリの具体的な手順は [インストールと更新](../../docs/guide/01-installation.md) を参照。
 
 ### 7. 締め
 
-- 起票 memory の todo を閉じる（`complete_todo`）。リリース内容は memory に一行
-- 最終報告: 版、tag の SHA、GitHub Release の URL、起動した CI、尻尾の結果、実機確認待ちのもの
+- アクションを閉じる（`complete_todo`）。リリース内容は memory に一行
+- 最終報告: バージョン、tag の SHA、GitHub Release の URL、起動した CI、後工程の結果、実機確認待ちのもの
 
-## 尻尾をプロジェクトに置くとき
+## 後工程をプロジェクトに置くとき
 
-背骨に分岐を足さない。プロジェクト側に、次のどれかで置く:
+共通手順に分岐を足さない。プロジェクト側に、次のどれかで置く:
 
 - `mise.toml` の `[tasks.release]` — 署名・配置・publish の手順をスクリプトに
 - `scripts/release.sh` — 同上
 - `.agents/skills/release/SKILL.md` または `.claude/skills/release/SKILL.md` — 手順が対話を伴うとき（実機確認の順番、デバイスの選択）
 
-尻尾は「tag が打たれた後に何をするか」だけを書く。版の決定や CHANGELOG は背骨に任せる。
+後工程は「tag が打たれた後に何をするか」だけを書く。バージョンの決定や CHANGELOG は共通手順に任せる。
 
 ## やらないこと
 
-- `cargo publish` / `npm publish` を自動で走らせない（尻尾に書かれていれば別）
+- `cargo publish` / `npm publish` を自動で走らせない（後工程に書かれていれば別）
 - annotated tag（`-a`）を使わない
 - CHANGELOG を持たないプロジェクトに CHANGELOG を作らない
 - 確認を複数回に分けない。2 で一度だけ

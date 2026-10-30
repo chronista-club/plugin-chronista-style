@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# branch-step — ブランチ名は「今どの段にいるか」だけを語る。
-# 段 = prefix（spike / exp / wip / review）、slug は不変。段が進んだら rename する。
+# branch-step — ブランチ名は「今どのステージにいるか」だけを語る。
+# ステージ = prefix（spike / exp / wip / review）、slug は wip 以降不変。ステージが進んだら rename する。
 # bash なのは、git subcommand と pre-push hook に runtime 依存を持ち込まないため。
 set -euo pipefail
 
@@ -19,14 +19,14 @@ HOOK_SRC="$HERE/../hooks/pre-push"
 
 usage() {
   cat <<'EOF'
-branch-step — 段 = prefix、slug は不変
+branch-step — ステージ = prefix、slug は wip 以降不変
 
   git next [<slug>] [--memory <id>] [--title <t>] [--no-pr] [--print-pr]
       昇格: spike→wip、exp→wip、wip→review。review に入る時だけ push + PR（base は trunk）
       --print-pr は gh を呼ばずコマンドを印字する（push と rename は行う）
   git keep [<slug>]      spike→exp（rename + 初 push）。育てる
   git drop [<slug>]      spike を削除。無言でよい
-  git board              段ごとの ref 一覧（committerdate 順）
+  git board              ステージごとの ref 一覧（committerdate 順）
   branch-step install [--local|--global] [--no-hook]
       git alias（next / keep / drop / board。既定は今の repo だけ）と、この repo の pre-push hook を入れる
       既存の別 pre-push があれば hook は入れずに案内だけ（exit 0）。--no-hook で alias だけ
@@ -60,7 +60,7 @@ worktree_of() {
     /^worktree /{wt=substr($0, 10)} /^branch /{if ($2 == ref) print wt}'
 }
 
-# slug は [a-z0-9-]+ だけ。stack 形（<段>/<epic>/<part>）は未決なので拒否する
+# slug は [a-z0-9-]+ だけ。stack 形（<stage>/<epic>/<part>）は未決なので拒否する
 check_slug() {
   [[ "$1" =~ ^[a-z0-9-]+$ ]] || die "slug '$1' は英小文字・数字・ハイフンだけ（stack 形のブランチは未決なので扱わない）"
 }
@@ -73,7 +73,7 @@ resolve() {
     case "$current" in
       spike/*|exp/*|wip/*|review/*|hotfix/*) check_slug "${current#*/}"; echo "$current"; return ;;
       "") die "detached HEAD。slug を指定してください" ;;
-      *) die "今のブランチ '$current' は段の列ではありません。slug を指定してください" ;;
+      *) die "今のブランチ '$current' はステージの列ではありません。slug を指定してください" ;;
     esac
   fi
   check_slug "$slug"
@@ -81,7 +81,7 @@ resolve() {
     git show-ref --verify --quiet "refs/heads/$stage/$slug" && matches="$matches$stage/$slug"$'\n'
   done
   [ -n "$matches" ] || die "slug '$slug' のブランチがありません"
-  [ "$(printf '%s' "$matches" | wc -l)" -eq 1 ] || die "slug '$slug' が複数の段にあります:"$'\n'"$matches"
+  [ "$(printf '%s' "$matches" | wc -l)" -eq 1 ] || die "slug '$slug' が複数のステージにあります:"$'\n'"$matches"
   printf '%s' "$matches"
 }
 
@@ -188,7 +188,7 @@ cmd_next() {
       [ -n "$memory" ] || die "$branch に PR がありません。PR body 冒頭の memory ID を付けて開く: git next --memory mem_xxx"
       open_pr "$branch" "$memory" "$title" "$print_pr"
       ;;
-    hotfix) die "$branch は main 起点の一列です。段は無いので main へ PR を" ;;
+    hotfix) die "$branch は main 起点の一列です。ステージは無いので main へ PR を" ;;
   esac
 }
 

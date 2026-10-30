@@ -135,7 +135,7 @@ TDD のテストリストは**変化速度で層を分ける**。
 
 | 層 | 責務 | 寿命 | 場所 |
 |----|------|------|------|
-| **memory（creo-memories）** | ユーザー観測可能な成功基準（不変） | todo 完了まで | memory 本文 |
+| **memory（creo-memories）** | ユーザー観測可能な成功基準（不変） | アクション完了まで | memory 本文 |
 | **PR description** | テストリスト（S/M/L ラベル付き、☐→☑） | PR マージまで | GitHub PR body |
 | **テストファイル** | テストの構造（describe / context / it 等）= リストの実装形 | コードの寿命 | テストファイル |
 

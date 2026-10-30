@@ -1,4 +1,4 @@
-# 02. ブランチの段 — 段 = prefix、slug は不変
+# 02. ブランチのステージ — ステージ = prefix、slug は wip 以降不変
 
 > **Status**: Draft
 > **Related**: `mem_1CfZvzMGQyyyQJLqyZMyR8`（Conception と裁定の原文）、`mem_1CfZz3aDDKfmVm7uRs6w9Z`（Mermaid 図 5 枚）、`mem_1Cfa1hzGjo7uen8XuchVQg`（起票）
@@ -6,7 +6,7 @@
 
 ## Abstract
 
-ブランチ名は「今どの段にいるか」だけを語る。一つの仕事に一つの slug（起票 memory と同じ、不変）、prefix が段。段が進んだら `git branch -m` で rename する。段ごとに語り手は一人 — PR 以前はブランチ、PR 以後は PR、merge 以後は trunk と tag。起点は全列 nightly なので名前に載せず、名前に載せるのは例外（hotfix）だけ。
+ブランチ名は「今どのステージにいるか」だけを語る。一つの仕事に一つの slug（アクションと同じ。GO で決めてから不変 — spike の名前は仮で、wip にするとき実装内容に合わなければ付け替える）、prefix がステージ。ステージが進んだら `git branch -m` で rename する。ステージごとに語り手は一人 — PR 以前はブランチ、PR 以後は PR、merge 以後は trunk と tag。起点は全列 nightly なので名前に載せず、名前に載せるのは例外（hotfix）だけ。
 
 固定点は `release` スキルの規約（trunk = `nightly`、`main` は出荷済みだけ、nightly → main は merge commit、lightweight tag）。ここは触らない。
 
@@ -16,9 +16,9 @@
 
 ## Architecture
 
-### 段
+### ステージ
 
-| 段 | 名前 | 語り手 | 起点 | 一括削除 | 閉じ方 |
+| ステージ | 名前 | 語り手 | 起点 | 一括削除 | 閉じ方 |
 |---|---|---|---|---|---|
 | 探る | `spike/<slug>` | ブランチ | nightly | **対象**（月次） | `wip/` へ昇格 / `exp/` へ / 削除 |
 | 育てる | `exp/<slug>` | ブランチ | nightly | 対象外 | 本人だけが閉じる。学びを memory へ |
@@ -64,7 +64,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 ## Implementation
 
 - 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。先頭で git が `!` alias の子に注入する `GIT_DIR` / `GIT_WORK_TREE` / `GIT_INDEX_FILE` / `GIT_PREFIX` / `GIT_COMMON_DIR` / `GIT_CONFIG_PARAMETERS` 等を剥がす（`GIT_AUTHOR_*` / `GIT_COMMITTER_*` / `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM` / `GIT_SSH*` / `GIT_EDITOR` / `GIT_EXEC_PATH` は残す）。これが無いと別 worktree への `git -C` や門のテストが本物の repo を触る。`install` が `git config --local alias.next '!<path> next'` 等を書き（既定は今の repo だけ。`--global` は明示時のみ）、今いる repo の pre-push（`--git-path hooks`）に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook があれば上書きせず案内だけで exit 0、`--no-hook` で alias だけ
-- slug の解決: slug は `^[a-z0-9-]+$` に限る（stack 形は未決なので拒否）。引数無しなら今のブランチ（段の列でなければ失敗）。引数ありなら段ごとに `git show-ref --verify` で完全一致を探し、0 件と複数件は失敗。glob や前方一致は使わない（`drop epic` が `spike/epic/a` を消さない）
+- slug の解決: slug は `^[a-z0-9-]+$` に限る（stack 形は未決なので拒否）。引数無しなら今のブランチ（ステージの列でなければ失敗）。引数ありならステージごとに `git show-ref --verify` で完全一致を探し、0 件と複数件は失敗。glob や前方一致は使わない（`drop epic` が `spike/epic/a` を消さない）
 - wip → review の門: ブランチが checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていない、または worktree に未 commit の変更があれば止まる（検査した状態と push する状態を一致させる）。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
 - PR 作成は `gh`。`--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。名前を dry-run にしなかったのは、副作用が無いと誤解させないため）
 - pre-push hook: local ref が `HEAD` / `@` なら `git symbolic-ref` で実名に解決してから判定する。local sha が全部 0（SHA-1 / SHA-256 どちらも）は削除なので通す。`<sha>:refs/heads/…` は ref 名を経由しないので止められない（仕様として SKILL.md に明記）
@@ -74,7 +74,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 
 - `train/<epic>` — 揃うまで待つ乗り物。部品の PR は train 宛て、全部乗ったら nightly へ PR 一本。取り込みは nightly → train の一方通行
 - 同時デプロイをなくす三拍（expand / migrate / contract）と `wip/<slug>-contract` の別 loop
-- stack `<段>/<epic>/<n>-<part>`（順番は名前に投影、強制は base 鎖）
+- stack `<stage>/<epic>/<n>-<part>`（順番は名前に投影、強制は base 鎖）
 - vendor した pre-push の版ズレ検出（hook 冒頭に version comment を置き、`install` が比較して警告する等）
 - checkout を使わない release: `git fetch` → `git commit-tree -p origin/main -p origin/nightly <tree>` で merge commit を作り `git push origin <sha>:main` → tag。lane からでも安全に出せるが幅が大きい。まずは worktree の前提確認で止める
 - VP lane のブランチ名（`mako/<name>` → `wip/<slug>`）は VP repo の別 loop。nexus / creo-memories / vantage-point の CLAUDE.md・AGENTS.md 追従も別 loop
@@ -110,3 +110,6 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-01: v0.33.0 の実地（creo-memories）で門のテストが本物の repo を触る事故。script 先頭で git 注入の `GIT_*` を剥がす。linked worktree から alias 経由で再現する回帰テスト。`install` は既存 hook を skip して exit 0、`--no-hook` 追加。branch-step 1.0.1。
 - 2026-10-01: creo-memories の `core.bare = true` を受け、release スキルに worktree の前提確認を足す（release 1.0.1、branch-step 1.0.2）。checkout を使わない release は未決へ。
 - 2026-10-01: 訂正（creo-memories lane が scratch で再現）。`core.bare = true` の原因は lane からの release ではなく、門の GIT_* 継承で hook テストの `git init` が本物を bare 化したこと（1.0.1 で解消済み）。前提確認は二重 checkout を止める目的でそのまま有効。release 1.0.2 で文言を訂正
+- 2026-10-30: 語彙 — 「起票 memory」をアクション（creo-memories の todo）と呼ぶ。本文の slug の説明を揃えた。
+- 2026-10-30: mako 裁定 — slug が不変なのは wip 以降。spike の名前は仮で、GO で wip にするとき実装内容と合わなければ適切な slug に付け替える（アクションの Meta もこの時点で決める）。script は未変更（`git branch -m` で足りる）。
+- 2026-10-30: 語彙 — 「段」を **ステージ** と呼ぶ（mako「段をもうちょっとわかりやすい単語に」）。記法は `<stage>/<slug>`。script の利用者向けメッセージとテストの文言も揃えた。動作は変えていない。

@@ -1,21 +1,21 @@
 ---
 name: branch-step
-description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。ブランチを切る・進める・PR を開く・畳むとき、ブランチ名で迷ったときに使う。
+description: ブランチ名は「今どのステージにいるか」だけを語る。ステージ = prefix（spike / exp / wip / review）、slug は wip 以降不変。git next / keep / drop でステージを進め、spike はローカル専用。ブランチを切る・進める・PR を開く・畳むとき、ブランチ名で迷ったときに使う。
 metadata:
   version: "1.0.3"
   tags: "git, branch, workflow, parallel-dev, kanban"
   source: "mem_1CfZvzMGQyyyQJLqyZMyR8 (設計と裁定), mem_1CfZz3aDDKfmVm7uRs6w9Z (図)"
 ---
 
-# Branch Step — 段 = prefix、slug は不変
+# Branch Step — ステージ = prefix、slug は wip 以降不変
 
-> **名前は看板ではなくカンバンの列。** 一つの仕事に一つの slug。変わるのは今いる段だけ。
+> **名前は看板ではなくカンバンの列。** 一つの仕事に一つの slug。変わるのは今いるステージだけ。
 
 設計の本文は [design 02](../../docs/design/02-branch-step-naming.md)。ここは使い方。
 
-## 段と語り手
+## ステージと語り手
 
-| 段 | 何をしている | 名前 | 語り手 |
+| ステージ | 何をしている | 名前 | 語り手 |
 |---|---|---|---|
 | 0 | 思いついた。コード無し | ブランチなし | memory |
 | 1 | 探っている。捨ててよい | `spike/<slug>` | ブランチ（**ローカル専用**） |
@@ -28,7 +28,8 @@ metadata:
 別列: `exp/<slug>` = 生かしておく実験。掃除と停滞検知の対象外、閉じるのは本人だけ。
 例外: `hotfix/<slug>` = main 起点の一列。main へ PR、tag、main を nightly へ back-merge。
 
-slug は起票 memory の Branch slug と同じ（`[a-z0-9-]+`、完全一致で探す）。worktree のディレクトリ名も slug。stack 形（`<段>/<epic>/<part>`）は未決なので script は扱わない。
+slug はアクションの Branch slug と同じ（`[a-z0-9-]+`、完全一致で探す）。worktree のディレクトリ名も slug。
+slug が不変なのは `wip/` 以降。`spike/` の名前は仮で、GO で `wip/` にするとき実装内容に合わなければ適切な slug に付け替える（spike はローカル専用なので `git branch -m spike/<old> wip/<new>` で済む。worktree があれば `git worktree move`）。アクションの Meta に書く slug もこの時点で決める。stack 形（`<stage>/<epic>/<part>`）は未決なので script は扱わない。
 起点は全列 nightly なので名前に載せない。type（feat / fix）は commit message の仕事で、ブランチ名には載せない。
 
 ## 操作は三つ
@@ -40,7 +41,7 @@ git drop [<slug>]
 git board
 ```
 
-- **`git next` = 昇格**。`spike/` → `wip/`、`exp/` → `wip/`（どちらも GO の瞬間）、`wip/` → `review/`。
+- **`git next` = 昇格**。`spike/` → `wip/`、`exp/` → `wip/`（どちらも GO の瞬間）、`wip/` → `review/`。slug を付け替えるなら `git next` ではなく `git branch -m`（spike はローカル専用なのでそれだけ。exp からなら remote の古い名前も消す）。
   review に入る時だけ **push して PR を開く**（base は trunk = `nightly`。local に無くても origin にあれば nightly、どちらにも無ければ `main`。body 冒頭に `--memory` の ID）。
   順序は **push が先、rename が後**。push が失敗しても local の名前は変わらない。`wip/` の backup push があれば消して `review/` で押し直す。`review/` から先は rename しない — 直しは PR の中で回す。
   `--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。本物の dry-run ではない）。
@@ -74,7 +75,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install --no
 git board
 ```
 
-`git for-each-ref` を段の列で並べるだけ。`origin/review/*` = レビュー担当の受信箱、`wip/*` で committerdate が古いもの = 停滞、`spike/*` は月次で気兼ねなく消す（`exp/*` は対象外）:
+`git for-each-ref` をステージの列で並べるだけ。`origin/review/*` = レビュー担当の受信箱、`wip/*` で committerdate が古いもの = 停滞、`spike/*` は月次で気兼ねなく消す（`exp/*` は対象外）:
 
 ```bash
 git for-each-ref --format='%(refname:short)' refs/heads/spike/ | xargs -r git branch -D
@@ -86,7 +87,7 @@ git for-each-ref --format='%(refname:short)' refs/heads/spike/ | xargs -r git br
 
 - `review/` → `wip/` の rename（PR を draft に戻す）
 - `train/<epic>`、expand / migrate / contract の三拍、VP lane 名の変更 — 案のまま design の「未決」に
-- release の背骨（nightly → main の merge commit と tag）— `release` スキルが固定点
+- release の共通手順（nightly → main の merge commit と tag）— `release` スキルが固定点
 
 ## 言語について
 
