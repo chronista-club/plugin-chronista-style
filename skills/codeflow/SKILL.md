@@ -1,6 +1,6 @@
 ---
 name: codeflow
-description: Spark（想起）から Conception（構想）を経て GO で作業に切り替え、SDG で仕様・設計を記録する開発フロー
+description: Spark（想起）から Conception（構想）を経て GO で作業に切り替え、Spec / Design / Guide をコードと同じ PR で育てる開発フロー
 metadata:
   tags: "development, workflow, sdg, spark, conception, second-opinion"
   version: "4.4.0"
@@ -10,14 +10,14 @@ metadata:
 
 記憶操作の前に [creo-memories の接続と未接続時の扱い](../chronista-style/reference/memory-connection.md) を読む。以下の記憶手順は、対応ツールが利用できる場合に実行する。
 
-**Code Flow**は、Spark（想起）から Conception（構想）を経て GO で作業に切り替え、仕様・設計を体系的に記録する開発ワークフロー。態度は `chronista-style` ルートの「基本姿勢」に従う — 穏やかに、真面目に、ユーモアを忘れずに。
+**Code Flow**は、Spark（想起）から Conception（構想）を経て GO で作業に切り替え、仕様・設計・使い方をコードと同じ PR で育てる開発ワークフロー。態度は `chronista-style` ルートの「基本姿勢」に従う — 穏やかに、真面目に、ユーモアを忘れずに。
 
 ## セッションの起動
 
 開発セッションの開始を依頼されたときに使う。継続中の作業では現在のステップから進み、起動手順を繰り返さない。固定メニューで選ばせない。
 
 1. **対象** — メッセージに「何を作る / 何を改善する」があればそれを採用。なければ地の文で聞く
-2. **現在地** — 注入済みの記憶コンテキストと現ブランチの `git log` で状態を拾い、不足する記憶だけ接続済みの `search` で補う。既存タスクの続きなら `list_todos` から該当 memory を引く
+2. **現在地** — 注入済みの記憶コンテキストと現ブランチの `git log` で状態を拾い、不足する記憶だけ接続済みの `search` で補う。既存タスクの続きなら `list_todos` から該当するアクションを引く
 3. **理解の提示** — 分かったこと、これからやること、置いた仮定、迷っている点を短く書く。Conception のどの手（調べる / 話す / 理解を書く）から入るか、それとも GO 済みで作業に入るかは、この提示の中で自分の判断として述べる
 4. **ズレと分岐** — 理解がズレていそうな所と、ユーザーが選ぶべき分岐だけ聞く。GO で走る（`codeflow` の「実装前の合意」）
 
@@ -26,10 +26,10 @@ metadata:
 Code Flow は **ステップ名で管理** します（番号は使いません）。依存関係は矢印のみで表現します。
 
 ```
-Spark → Conception → GO → SDG → Branch & PR → Implementation → Release（条件付き）→ Learning
+Spark → Conception → GO → Spec → Design → Implementation → Guide → PR → Release（条件付き）→ Learning
 ```
 
-硬い線は **GO** の一本だけ。GO の前は一つの自由な空間（Conception）、GO の後は作業のパイプライン。「何かが先」という順番は無い。
+硬い線は **GO** の一本だけ。GO の前は一つの自由な空間（Conception）、GO の後は作業のパイプライン。「何かが先」という順番は無い。ブランチ名のステージ（`spike/` `wip/` `review/`）との対応は `branch-step`。
 
 ### Spark（想起）
 
@@ -39,12 +39,12 @@ Spark → Conception → GO → SDG → Branch & PR → Implementation → Relea
 
 Spark が形になるまでの会話。**順番は無い。** 必要な手を必要なときに打つ。
 
-- **調べる（Discovery）** — コードベース、既存実装、類似事例、過去の記憶（`search`）。触るコードのパスで `docs/` を grep し、既存の design があれば読んでから話す。同じ領域の `spark` も `search` で拾い、繋がるものがあれば会話に出す（忘れられた火花を持ってくるのも AI の役目）。会話の途中で何度でも
+- **調べる（Discovery）** — コードベース、既存実装、類似事例、過去の記憶（`search`）。触るコードのパスで `docs/` を grep し、既存の design があれば読んでから話す。同じ領域の `spark` も `search` で拾い、繋がるものがあれば会話に出す（忘れられた火花を持ってくるのも AI の役目）。コードで探るなら `spike/<slug>` を切る（ローカル専用、捨ててよい。`branch-step`）。会話の途中で何度でも
 - **話す（Discussion）** — 方向性を一緒に決める。**ここが一番楽しい。** 選択肢を並べる（「A案、B案、あと禁断のC案」）、雑談も脱線も歓迎、「それ、本当に必要？」は最高の質問。完璧な案を出そうとしない、決まらなくても焦らない
 - **理解を書く** — 質問票ではなく、理解の提示と差分。自分の理解を短く書く（何を / なぜ / やらないこと / 置いた仮定 / 迷っている点）。聞くのは、理解がズレていそうな所と、ユーザーが選ぶべき分岐だけ。推測できることは仮定として明示する。分岐が 2〜4 個に離散的に絞れたときだけ利用可能な質問ツールを使い、使えない場合や開いた問いは地の文で聞く。「わからない」「後で決める」も回答 — 仮定を置いて進み、仮定を書き残す
 - **合議（council）** — 判断軸が複数あって明確な勝者がいない分岐は `council` で 4 voice にかけ、trade-off と最強の dissent を表に出す
 
-合意した理解は起票 memory の「AI の理解」節に書き戻す。ユーザーの裁定は原文のまま引用して不変に、理解はその上に積む。
+合意した理解はアクションの「AI の理解」節に書き戻す。ユーザーの裁定は原文のまま引用して不変に、理解はその上に積む。
 
 ### GO（実装前の合意）
 
@@ -52,19 +52,32 @@ Spark が形になるまでの会話。**順番は無い。** 必要な手を必
 
 合意の粒度は軽くてよい — 短い方針提示に「いいね」「進めて」の GO で走り出せる状態を保つ。重い設計文書を待たず、GO なしで走らない。GO の後は合意した範囲を走り切り、途中の質問は回答に依存しない部分を済ませてからターン末尾でまとめて聞く。
 
-GO の瞬間に memory を `spark` から `todo` に進める（Issue-first）。GO が要った変更 — ユーザーが選ぶべき分岐があった変更 — は、その分岐の答えを design に書く価値がある。分岐が無かった変更に design は書かない。
+GO の瞬間にやることは二つ。
 
-### SDG（Spec-Design-Guide）
+- **アクション** — memory を `spark` からアクション（creo-memories の `todo`）に進める（Issue-first）。タスクはアクションとして起票し、進捗も同じアクションに積む（Issue / Todo / Decision が一つの層）。起票の中身（成功基準・非対象・AI の理解・Branch slug）は `chronista-style` ルートの「Issue-first の原則」、API の作法（status / tags / supersedes / 追記の仕方）は `creo-memories` スキルに従う。ここには複写しない
+- **ブランチ** — `wip/<slug>` にする。spike があれば `git next` で昇格、無ければ切る。spike の名前が GO した実装内容と合っていなければ、ここで適切な slug に付け替える — slug が不変なのは wip 以降（`branch-step`）。worktree や lane で隔離するかは `parallel-dev`
 
-spec / design を Draft で `docs/` に置く（何を書くか・どう生かすかは `spec-design-guide`）。実装タスクは 1 振る舞い 1 単位に割る。手順は `tdd`。
+### Spec（What & Why）
 
-#### Issue 連携 — memory-as-issue
+GO で合意した What と Why を `docs/spec/` に Draft で置く（骨格は `spec-design-guide`、ひな形は `sdg`）。種はアクションの成功基準と非対象。既存の spec の範囲内の変更なら新しく書かず、design の Related から既存の spec を指す。
 
-タスクは creo-memories の memory として起票し、進捗も同じ memory に積む（Issue / Todo / Decision が一つの層）。起票の中身（成功基準・非対象・AI の理解・Branch slug）は `chronista-style` ルートの「Issue-first の原則」、API の作法（status / tags / supersedes / 追記の仕方）は `creo-memories` スキルに従う。ここには複写しない。
+### Design（How）
 
-### Branch & PR（ブランチ & PR フロー）
+分岐の答え — どう作るか — を `docs/design/` に Draft で置く。GO が要った変更、つまりユーザーが選ぶべき分岐があった変更に書く。分岐が無かった変更に design は書かない。関連（spec・アクション・コードパス）と「やってはいけない」を足す（`spec-design-guide`）。
 
-trunk は `nightly`、ブランチ名は `<段>/<slug>`（`spike/` → `wip/` → `review/`、段は `git next` で進める）、PR body 冒頭に memory ID。規約の本体は `chronista-style` ルートの「ブランチ運用（nightly trunk）」と「Branch slug の規約」、操作は `branch-step`。PR を出す前に `verification` を通す（設計に触れた変更なら design が同じ PR にあること、もそこで確かめる）。
+### Implementation（実装・TDD）
+
+実装タスクを 1 振る舞い 1 単位に割り、`tdd` の RED-GREEN-REFACTOR で一つずつ通す。テストファーストで書き、失敗を確認し、最小限のコードで通す。
+
+対象パスのコードを変えたら同じブランチで design を触る — 変わったことは Status log に、踏んだ地雷は「やってはいけない」に追記する（`spec-design-guide`）。進捗はアクションに追記する。作業中に見つけた範囲外の問題は直さず `spark` に置き、最終報告で触れる（`chronista-style` ルートの「Issue-first の原則」）。
+
+### Guide（Usage）
+
+使い方が変わった・生まれたら `docs/guide/` に書く。動いたものに対して書くので Implementation の後、同じ PR に入れる。内部だけの変更なら書かない。
+
+### PR（レビューとマージ）
+
+入口は `verification` — 証拠を揃え、設計に触れた変更なら design、使い方が変わったなら guide が同じブランチにあることを確かめる。通ったら `git next` で `review/<slug>` に進める: push して PR を開く（base は trunk = `nightly`、body 冒頭にアクションの memory ID）。wip → review の門は `branch-step`。レビューは team-bucciarati（深さの選択はそちら）。
 
 #### PR のマージ条件
 
@@ -79,11 +92,7 @@ team-b の判定は固定の文字列ではなく、レビュー対象・結論�
 
 実装開始の GO は別の合意であり、それだけでマージ承認とは扱わない。ユーザーが「まだマージしない」など明示的に保留している場合は、その解除を待つ。
 
-### Implementation（実装・TDD）
-
-`tdd` スキルの RED-GREEN-REFACTOR サイクルに従う。テストファーストで書き、失敗を確認し、最小限のコードで通す。
-
-対象パスのコードを変えたら同じブランチで design を触る — 変わったことは Status log に、踏んだ地雷は「やってはいけない」に追記する（`spec-design-guide`）。進捗は起票した memory に追記する。
+マージは squash（`chronista-style` ルートの「ブランチ運用」）。マージしたら worktree を畳み、アクションを閉じる（`complete_todo`）。design の Status を Draft から Active に進め、Status log に一行。
 
 ### Release（リリース & 配布・条件付き）
 
@@ -92,7 +101,7 @@ team-b の判定は固定の文字列ではなく、レビュー対象・結論�
 - PR マージ → リリースが必要な場合
 - デプロイが必要な場合
 
-手順は [release スキル](../release/SKILL.md) — 背骨（版の検出 → CHANGELOG → release commit → nightly → main → tag → GitHub Release）は共通、尻尾（CI / publish / 署名 / 配置）はプロジェクト側に委譲。出荷した design の Status を Draft から Active に進め、Status log に一行。マージ後は起票した memory の todo を閉じる。
+手順は [release スキル](../release/SKILL.md) — 共通手順（バージョンの検出 → CHANGELOG → release commit → nightly → main → tag → GitHub Release）を踏み、後工程（CI / publish / 署名 / 配置）はプロジェクト側に委譲。出荷した design の Status log にバージョンを一行。
 
 ### Learning（学習）
 

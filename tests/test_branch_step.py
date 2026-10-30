@@ -275,7 +275,7 @@ exit 1
         for slug in ("epic", "*", "epic/a", "Epic", "a b"):
             result = self.step("drop", slug, check=False)
             self.assertNotEqual(result.returncode, 0, slug)
-            self.assertNotIn("複数の段", result.stderr, slug)
+            self.assertNotIn("複数のステージ", result.stderr, slug)
         self.assertIn("spike/epic/a", self.local_branches())
         self.git("checkout", "-q", "spike/epic/a")
         result = self.step("next", check=False)

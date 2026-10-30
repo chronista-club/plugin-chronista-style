@@ -62,7 +62,7 @@ context=$(cat <<EOF
 ### creo-memories
 
 - Context Engine の記憶コンテキストが実際に届いていれば重複検索は不要。未注入なら、接続済みの creo-memories の \`search\` で必要な記憶だけ補う。未接続なら作業は続け、記憶の取得・保存は未実施と報告する
-- \`remember\` / \`create_todo\` の Atlas 候補: \`${primary_candidates}\`（remote 由来: \`${fallback_candidates:-なし}\`）。exact match が無ければ、同じ repo の過去の todo がある Atlas に倣う。前例も無ければ Personal に置いて一言添える。置き場で止まらない、聞かない
+- \`remember\` / \`create_todo\` の Atlas 候補: \`${primary_candidates}\`（remote 由来: \`${fallback_candidates:-なし}\`）。exact match が無ければ、同じ repo の過去のアクション（todo）がある Atlas に倣う。前例も無ければ Personal に置いて一言添える。置き場で止まらない、聞かない
 
 ### 規律エッセンス（詳細は各スキル）
 

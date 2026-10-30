@@ -21,7 +21,7 @@ chronista-style (このスキル)
 ├── creo-memories        【最優先】永続記憶
 ├── codeflow             開発フロー（Spark → Conception → GO → …）
 ├── parallel-dev         並列開発の道具選び（隔離・出荷の 2 層）
-├── branch-step          ブランチの段（spike / wip / review）と git next / keep / drop
+├── branch-step          ブランチのステージ（spike / wip / review）と git next / keep / drop
 ├── spec-design-guide    spec / design / guide と Living Documentation
 ├── tdd                  テスト駆動開発【規律】
 ├── systematic-debugging 体系的デバッグ【規律】
@@ -47,7 +47,7 @@ chronista-style (このスキル)
 - 経路が追える — 入力から出力まで直線。隠れた抽象で迷子にならない
 - 意図が残る — What はドキュメントに、Why は memory に生きている
 
-**二つは同じ源から来る。** 責務（置き場）と Simplicity（分類）と Straightforward（直線）は、テスト可能性と変更の局所性 = 強さと、可読性 = 美しさを**同時に**生む技法。だから設計哲学は North Star の手段になる。
+**二つは同じ源から来る。** 責務（置き場）と Simplicity（分類）と Straightforward（直線）は、テストしやすさと、変更が一箇所で済むこと = 強さと、可読性 = 美しさを**同時に**生む技法。だから設計哲学は North Star の手段になる。
 強さだけを追うと防御的コードで美しさが死に、美しさだけを追うと過剰な抽象で強さが死ぬ — 迷ったら「**これは強く、かつ美しくするか？**」を判定基準にする。
 
 例: 重複メソッドの統合 — 統合後の抽象が自然なら強く美しくなる（やる）。統合のために不自然な抽象を発明するなら、3 行の重複の方がまだ直線的（やらない）。ルールではなく、この問いで個別に判定する。
@@ -58,9 +58,9 @@ chronista-style (このスキル)
 >
 > 気づきの問いと実例: [設計の判断集](reference/design-judgments.md)
 
-### 責務 — 置き場・所有・変更の局所性
+### 責務 — 変わる理由ごとに置く
 
-コードをどう並べるかより先に、誰が何を持つか。「この記述が変わるとき、何が変わったからか」でその主のそばに置く。似た実装は「片方のバグはもう片方でもバグか」で同じ責務かを判定する。一つの変更が何本の道を塞ぐか、一つのファイルを開く理由が何通りあるかが、責務の塗り広がりの目安。
+コードをどう並べるかより先に、誰が何を持つか。「この記述が変わるとき、何が変わったからか」で、その変わる元のそばに置く。似た実装は「片方のバグはもう片方でもバグか」で同じ責務かを判定する。一つの変更が多くの場所を触る、一つのファイルを開く理由が何通りもある — どちらも責務が散らばっているサイン。
 
 ### Simplicity — 副作用と計算の分離
 
@@ -87,7 +87,7 @@ Action に埋まった計算は、テストできず、責務の線も引けな�
 | **テスト（TDD）** | calculations は純粋関数テスト、actions は統合テスト。抜く前に設計意図を 1 本のテストで pin |
 | **ドキュメント（SDG）** | 骨格どおり。必要な情報だけ。冗長さを排除。実測と制約は文書に戻す |
 | **デバッグ** | Straightforward な経路なら原因特定が容易 |
-| **コードレビュー** | 不要な複雑さと責務の塗り広がりの指摘基準 |
+| **コードレビュー** | 不要な複雑さと、責務の散らばりの指摘基準 |
 | **リファクタ** | 完璧を目指さない。「次に触るときに前より見通しが良い」が基準。範囲外の気づきは `/spark` |
 
 ---
@@ -111,7 +111,7 @@ Action に埋まった計算は、テストできず、責務の線も引けな�
 
 ### 設定・データ表現の既定値: KDL first
 
-人間が読み書きする設定・スキーマ層は **KDL を既定**とする。コメント・複数行値・型注釈をネイティブにサポートし、vp lane 等エコシステムで採用済み。JSON は機械間 wire format としては有用なので、互換性で JSON が必須なら「設計層は KDL、出力層で JSON 化」を検討する。
+設定・スキーマに加え、**オブジェクトのシリアライズ**（アプリの状態や管理情報の保存、正本ファイル、自前のコンポーネント間の受け渡し）も **KDL を既定**とする。コメント・複数行値・型注釈をネイティブに持ち、人が開いても読める。KDL ライブラリ（club-kdl）を自分たちで開発しているので、表現が足りなければ JSON に逃がす前にライブラリの拡張を検討する。ただし既定は強制ではなく、JSON の方が合っている場面ではそちらを優先する — 外部連携（JSON が契約になっている API、JSON 前提のツールやサービス）など。境界でだけ JSON が要るなら、内側は KDL のまま境界で変換する手もある。
 
 ---
 
@@ -150,7 +150,7 @@ Context Engine の記憶コンテキストが実際に届いていれば活用�
 
 タスクに明確に該当するスキルがあれば使う。該当判断はモデルに委ねる。ただし**規律スキル（tdd / systematic-debugging / verification）は該当場面で省略しない** — これらは能力の補助ではなく、事故を防ぐ検証手順だから。
 
-開発の流れは `codeflow`（Spark → Conception → GO → SDG → Branch & PR → Implementation → Release → Learning）、文書は `spec-design-guide`、並列作業の道具選びは `parallel-dev`、判断軸が複数ある決定は `council`。
+開発の流れは `codeflow`（Spark → Conception → GO → Spec → Design → Implementation → Guide → PR → Release → Learning）、文書は `spec-design-guide`、並列作業の道具選びは `parallel-dev`、判断軸が複数ある決定は `council`。
 
 ---
 
@@ -171,7 +171,7 @@ Context Engine の記憶コンテキストが実際に届いていれば活用�
 ## プロジェクト管理
 
 - **creo-memories の memory** で Issue 管理（SSOT）。GitHub Issues / 外部 tracker は使わない
-- PR は `gh` コマンドで作成。body 冒頭に memory ID（`mem_xxx`）を記載し、マージ後に `complete_todo` で閉じる
+- PR は `gh` コマンドで作成。body 冒頭にアクションの memory ID（`mem_xxx`）を記載し、マージ後に `complete_todo` で閉じる
 
 ### ブランチ運用（nightly trunk）
 
@@ -181,32 +181,33 @@ Context Engine の記憶コンテキストが実際に届いていれば活用�
 memory ─思いつき─▶ spike/x ─GO─▶ wip/x ─検証 green─▶ review/x ─PR(squash)─▶ nightly ─merge(--no-ff)─▶ main ─tag─▶ vX.Y.Z
 ```
 
-- ブランチの名前は **`<段>/<slug>`**。段 = prefix（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は不変。段が進んだら rename する（`git next`）。段の意味と操作の本体は `branch-step`
+- ブランチの名前は **`<stage>/<slug>`**。ステージ = prefix（`spike/` `wip/` `review/`、別列 `exp/`、例外 `hotfix/`）、slug は wip 以降不変（spike の名前は仮。GO で実装内容に合わせる）。ステージが進んだら rename する（`git next`）。ステージの意味と操作の本体は `branch-step`
 - 日々の PR は **nightly 宛て**。`git next` が `review/` に入る時に `--base nightly` で開く。手で開くなら `gh pr create --base nightly`
-- nightly 宛て PR の merge は **squash**: `gh pr merge --squash --delete-branch`。その worktree を畳み、`git worktree prune`。締めに起票 memory を `complete_todo`
+- nightly 宛て PR の merge は **squash**: `gh pr merge --squash --delete-branch`。その worktree を畳み、`git worktree prune`。締めにアクションを `complete_todo` で閉じる
 - リリースは `release` スキル。nightly → main は **merge commit**（squash すると履歴が発散し、次回リリースで全面コンフリクトする）、main で tag
 - `hotfix/<slug>` だけ main 起点。main へ PR、tag、main を nightly へ back-merge
 
-**GitHub のデフォルトブランチは `main` のまま**にすること。プラグイン marketplace
-（`chronista-club/chronista-plugins`）は `main` を配布元にしているため、nightly を
-デフォルトにすると未リリース版が配布される。その代わり PR のベース指定漏れに注意
-（`git next` を使えば付け忘れない）。
+GitHub のデフォルトブランチは `main` を推奨。`main` が配布元になっているリポジトリ
+（この plugin なら marketplace `chronista-club/chronista-plugins`）で nightly を
+デフォルトにすると、未リリース版が配布される。リポジトリの事情で nightly をデフォルトに
+しているなら、それはそれでよい。main のときは PR のベース指定漏れに注意（`git next` を
+使えば付け忘れない）。
 
 ### Issue-first の原則（ガイドライン）
 
-**新機能・改修は memory 起票から始める。** 手を動かす前に「このタスクの成功基準はなに？」と聞かれて memory を指せる状態にする。
+**新機能・改修はアクションの起票から始める。** アクション = タスクを持つ memory（creo-memories の todo）。手を動かす前に「このタスクの成功基準はなに？」と聞かれてアクションを指せる状態にする。
 
 ```
 Spark（`/spark` で原文のまま pack）
     ↓ Conception → GO
-memory を todo に（creo-memories、category: todo）
+memory をアクションに（creo-memories の todo、`create_todo`）
     └─ 成功基準（チェックボックス）
     └─ 想定変更ファイル
     └─ 非対象（別 memory）を明記
     └─ AI の理解（理解が変わるたびに更新。裁定の原文は不変、理解はその上に積む）
     └─ ## Meta / Branch slug を記載
     ↓
-Branch（`spike/<slug>` で探るか `wip/<slug>` で作る。段は `branch-step`）
+Branch（`spike/<slug>` で探るか `wip/<slug>` で作る。ステージは `branch-step`）
     ↓
 実装
     ↓
@@ -219,7 +220,7 @@ PR（nightly 宛て、body 冒頭に memory ID）
 
 #### Branch slug の規約
 
-ブランチ名は `<段>/<slug>`（`wip/plugin-spec-compliance` 等）。名前に載るのは**今いる段**だけで、type（feat / fix / docs …）は commit message の仕事。slug は起票 memory と同じで、生まれてから出荷まで不変。worktree のディレクトリ名も slug。
+ブランチ名は `<stage>/<slug>`（`wip/plugin-spec-compliance` 等）。名前に載るのは**今いるステージ**だけで、type（feat / fix / docs …）は commit message の仕事。slug はアクションと同じで、GO で決めてから出荷まで不変。spike の名前は仮で、GO で `wip/` にするとき実装内容に合わなければ付け替える。worktree のディレクトリ名も slug。
 
 memory のタイトルは日本語混じり・長大になりがちで、そのままブランチ名にすると GitHub 側で non-ASCII branch name の warning が出るし、CLI で扱いにくい。
 

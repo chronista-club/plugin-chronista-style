@@ -49,7 +49,7 @@ design には「関連」（spec・memory・コードパスへの入口）と「
 # 39. 記憶の分類の構造
 
 > **Status**: Draft | Active | Deprecated（Status log 参照）
-> **Related**: spec 25、`mem_xxx`（起票 / 裁定）
+> **Related**: spec 25、`mem_xxx`（アクション / 裁定）
 > **対象**: `src/memory/classify.rs`, `migrations/0012_*.surql`
 ```
 
@@ -68,11 +68,13 @@ Author・作成日・更新日は書かない。git が知っている。**対�
 | ステップ | 動き |
 |---|---|
 | Conception の「調べる」 | 触るコードのパスで `docs/` を grep し、既存の design を読んでから話す。無ければ無いと分かる — 無理に作らない |
-| GO | ユーザーが選ぶべき分岐があった変更は、その答えを design に書く価値がある。分岐が無かった変更に design は書かない |
-| SDG | spec / design を Draft で置く |
+| GO | ユーザーが選ぶべき分岐があったか — それが design を書くかの判断。分岐が無かった変更に design は書かない |
+| Spec | What & Why を Draft で置く。既存の spec の範囲内なら新しく書かず、design の Related から指す |
+| Design | 分岐の答え（How）を Draft で置く |
 | Implementation | 対象パスを変えたら同じブランチで design に追記（Status log / やってはいけない） |
-| PR の前 | `verification`: 設計に触れた変更なら design が同じ PR にあること |
-| Release | Status を Draft から Active に。Status log に出荷を一行 |
+| Guide | 使い方が変わった・生まれたら、動いたものに対して書く。同じ PR に入れる |
+| PR | `verification`: 設計に触れた変更なら design、使い方が変わったなら guide が同じ PR にあること。マージで Status を Draft から Active に |
+| Release | Status log に出荷（バージョン）を一行 |
 
 ## 見つけ方
 

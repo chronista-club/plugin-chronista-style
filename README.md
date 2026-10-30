@@ -23,16 +23,16 @@ Claude Code / Codex で共通の `skills/` を使う。導入・更新・MCP 接
 | スキル | 種別 | 説明 |
 |--------|------|------|
 | `chronista-style` | 入口 | North Star・設計哲学・基本姿勢・プロジェクト管理の規約。各スキルへ routing する |
-| `codeflow` | プロセス | Spark（想起）→ Conception（構想）→ GO で作業に切り替え、SDG で仕様・設計を記録する開発フロー |
+| `codeflow` | プロセス | Spark（想起）→ Conception（構想）→ GO で作業に切り替え、Spec / Design / Guide をコードと同じ PR で育てる開発フロー |
 | `parallel-dev` | プロセス | 並列開発の道具選び。「隔離・出荷」2 層モデルで worktree / VP lane / stacked PR を判断 |
-| `branch-step` | プロセス | ブランチの段。`<段>/<slug>`（spike / wip / review）を `git next` / `keep` / `drop` で進める。spike はローカル専用 |
+| `branch-step` | プロセス | ブランチのステージ。`<stage>/<slug>`（spike / wip / review）を `git next` / `keep` / `drop` で進める。spike はローカル専用 |
 | `spec-design-guide` | 文書 | spec（What & Why）・design（How）・guide（Usage）を `docs/` に書き、コードと同じ PR で育てる |
 | `tdd` | 規律 | テストファーストで実装する RED-GREEN-REFACTOR サイクル |
 | `systematic-debugging` | 規律 | 根本原因を特定してから修正する 4 ステップデバッグ |
 | `verification` | 規律 | 証拠なき完了宣言を防ぐ。検証コマンド実行 → 出力確認 → 主張 |
 | `spark` | 入口 | 原文のアイデアを記憶へ保存 |
 | `sdg` | 入口 | spec / design / guide の文書生成 |
-| `release` | 出荷 | 版・CHANGELOG・tag・リリース手順 |
+| `release` | 出荷 | バージョン・CHANGELOG・tag・リリース手順 |
 | `council` | AI 協働 | 4 voice の合議で意思決定。多義的なトレードオフや go/no-go 判断に |
 
 規律 3 スキルは該当場面で省略しない。それ以外の該当判断はモデルに委ねる。
@@ -44,12 +44,12 @@ Claude Code / Codex で共通の `skills/` を使う。導入・更新・MCP 接
 | `/chronista-style:spark` / `$spark` | 降ってきたアイデアを解釈ゼロで memory に pack。一手で終わる |
 | `/chronista-style:codeflow` / `$codeflow` | 開発セッションを開始。理解を提示してから該当ステップに入る |
 | `/chronista-style:sdg` / `$sdg` | spec / design / guide のひな形を `docs/` に起こす |
-| `/chronista-style:release` / `$release` | リリースの背骨（版・CHANGELOG・nightly → main・tag・GitHub Release）。尻尾はプロジェクト側に委譲 |
+| `/chronista-style:release` / `$release` | リリースの共通手順（バージョン・CHANGELOG・nightly → main・tag・GitHub Release）。後工程はプロジェクト側に委譲 |
 
 ## 開発フロー
 
 ```
-Spark（想起、どちらからでも）→ Conception（構想: 調べる・話す・理解を書く・合議、順不同）→ GO → SDG → Branch & PR → Implementation → Release → Learning
+Spark（想起、どちらからでも）→ Conception（構想: 調べる・話す・理解を書く・合議、順不同）→ GO → Spec → Design → Implementation → Guide → PR → Release → Learning
 ```
 
 硬い線は GO の一本だけ。詳細は `codeflow` スキルを参照。

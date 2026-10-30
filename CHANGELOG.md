@@ -8,6 +8,18 @@
 
 ## [Unreleased]
 
+### Changed
+- release: 「版」の表記を「バージョン」に統一（バージョンの検出・正本・書き換え等）。コマンドの description、README、codeflow の参照も同様。
+- release: 比喩の「背骨 / 尻尾」を「共通手順 / 後工程」に言い換え。codeflow・branch-step・README の参照も同様。
+- release: 共通手順に入り込んでいた本リポジトリ専用の分岐（「両環境対応プラグイン」）を「リリース前の検証」に一般化。リポジトリが定める同期・検証を release commit の前に通し、失敗したら止まる。cachebuster の注意はプラグイン形式の後工程の記述に統合。
+- chronista-style: 設計哲学「責務」の説明を「置き場・所有・変更の局所性」から「変わる理由ごとに置く」に言い換え（design-judgments も同様）。「変更の局所性」は「変更が一箇所で済むこと」に。本文・問いの表・チェックリストの比喩も言い換え（「何本の道を塞ぐか」→「何箇所を触るか」、「塗り広がり」→「散らばり」、「その主のそばに」→「その変わる元のそばに」）。
+- chronista-style: KDL first の範囲を「人間が読み書きする設定・スキーマ」からオブジェクトのシリアライズ全般（状態・管理情報の保存、正本ファイル、自前のコンポーネント間の受け渡し）に拡大。club-kdl を自分たちで開発しているので、表現が足りなければ JSON に逃がす前にライブラリ拡張を検討する。JSON の方が合っている場面（外部連携など）ではそちらを優先する。
+- chronista-style: 「GitHub のデフォルトブランチは `main` のままにすること」を推奨に緩める。理由（main が配布元なら未リリース版が出る）は残し、事情があって nightly をデフォルトにしているリポジトリも認める。
+- 語彙: タスクを持つ memory（creo-memories の todo、「起票 memory」）を **アクション** と呼ぶ。chronista-style（Issue-first・ブランチ運用）、codeflow、release、branch-step、spark、tdd、sdg、spec-design-guide、memory-connection、session-start hook、design 02 を揃えた。ツール名（`create_todo` / `complete_todo` / `list_todos`）はそのまま。設計哲学の actions（Grokking Simplicity）とは別の語なので、こちらはカタカナで書く。
+- codeflow / branch-step / chronista-style: slug が不変なのは `wip/` 以降に。`spike/` の名前は仮で、GO で `wip/` にするとき実装内容と合わなければ適切な slug に付け替える（`git branch -m spike/<old> wip/<new>`。アクションの Meta もこの時点で決める）。script は未変更。design 02 の Status log に裁定。
+- codeflow: 流れを `Spark → Conception → GO → Spec → Design → Implementation → Guide → PR → Release（条件付き）→ Learning` に。「Branch & PR」を割り、ブランチは GO の瞬間に（アクションの起票と同時）、PR は Implementation の後に。SDG を Spec / Design / Guide に分け、guide は動いたものを見てから書く。アクションを閉じる・design を Active にするのは Release ではなく PR のマージ時（Release は Status log にバージョン一行）。Conception に spike、Implementation に「1 振る舞い 1 単位」と「範囲外は spark」。spec-design-guide の対応表、README、root の流れを揃え、design 05 を追加。
+- 語彙: 「段」（spike / wip / review）を **ステージ** と呼ぶ。記法は `<stage>/<slug>`。branch-step（SKILL・script の利用者向けメッセージ・テスト文言）、chronista-style、parallel-dev、README、design 02 を揃えた。script の動作は変えていない。
+
 ## [0.35.0] - 2026-10-27
 
 ### Changed
