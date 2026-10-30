@@ -1,6 +1,6 @@
 # 05. codeflow のステップ構成
 
-> **Status**: Draft
+> **Status**: Active
 > **Related**: `mem_1CgYPcydRMs1DE88VjS4FL`（アクションと裁定）、design 02（ブランチのステージ）、design 04（PR のマージ判断）
 > **対象**: `skills/codeflow/SKILL.md`, `skills/spec-design-guide/SKILL.md`, `skills/branch-step/SKILL.md`, `skills/chronista-style/SKILL.md`
 
@@ -40,3 +40,4 @@ branch-step のステージ（0 思いついた → 1 spike → 2 wip → 3 revi
 ## Status log
 
 - 2026-10-30: Conception（mako「Implementation ってここでいいの？」「PR のあとってこと？」「Spec → Design → Implementation → Guide でもいいかもね」）と GO「今までの観点盛り込んで GO」を受けて Draft。codeflow / spec-design-guide / branch-step / chronista-style / README / design 02 を `wip/codeflow-steps` で同じ PR に。
+- 2026-10-30: PR #9 を squash merge（nightly `2db47ea`）。mako「マージして」。Status を Active に。
