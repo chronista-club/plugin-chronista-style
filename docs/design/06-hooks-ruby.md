@@ -1,6 +1,6 @@
 # 06. hooks の実装言語とエラー報告
 
-> **Status**: Draft
+> **Status**: Active
 > **Related**: `mem_1CgYRtErN8zMr1d34Jyrod`（アクションと裁定）、design 01（Hooks と記憶接続）
 > **対象**: `hooks/`, `tests/test_hooks.py`, `.mise.toml`, `.github/workflows/validate.yml`
 
@@ -65,3 +65,4 @@ tripwire の内部エラーに systemMessage を使わないのは、Stop での
 - 2026-10-30: Conception（mako「hooks を ruby に統一して、コケたらきちんとエラー」「ruby じゃなくても。sh は読みづらい、python は得意じゃない」→ Ruby を提案）、GO。`wip/hooks-ruby`。
 - 2026-10-30: Moody Blues レビュー（PR #10、NEEDS WORK）。実 transcript 391 本で旧新の判定は全件一致したが、`tool_reference` を未知型として拒否するため Stop のたびに hook error が出ることを指摘。既知型に追加、Codex の暗号化ツール出力と `transcript_path: null` は静かに通す、session-start は cwd が無くても規律エッセンスを出す、LANG=C の日本語パス、stderr の長さ上限、macOS system ruby の CI ジョブ、verification / bin/setup / design 01 の古い記述を直した。
 - 2026-10-31: Moody Blues 再検証（NEEDS WORK、残りは小さい）。暗号化出力で読むのを止めると後ろの異常が黙る → 最後まで読んでから `OpaqueEvidence`。変異テスト 17 個で守られていなかった修正にテストを足した（生の 0xFF、`\r` / U+2028 の ACK、`RUBYOPT=-w`）。想定外の例外でも規律エッセンスは出す。lint は `ruby -wc` に統一。
+- 2026-10-31: Moody Blues 再確認 COMMIT READY（df6a8fa）、CI 4 本緑。PR #10 を squash merge。Status を Active に。実機（Claude Code / Codex）での systemMessage / hook error 通知の見え方は実機確認待ち。
