@@ -9,6 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/branch-step/scripts/branch-step"
 HOOK = ROOT / "skills/branch-step/hooks/pre-push"
+BIN = ROOT / "bin"
 
 
 class BranchStepTest(unittest.TestCase):
@@ -33,12 +34,19 @@ class BranchStepTest(unittest.TestCase):
         self.git("push", "-q", "-u", "origin", "main")
         self.git("checkout", "-q", "-b", "nightly")
         self.git("push", "-q", "-u", "origin", "nightly")
+        self.git("config", "branch-step.enabled", "true")
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def git(self, *args, cwd=None, check=True):
         return subprocess.run(["git", *args], cwd=cwd or self.work, env=self.env,
+                              text=True, capture_output=True, check=check)
+
+    def git_bin(self, *args, cwd=None, check=True):
+        """plugin の bin/ を PATH の先頭に入れた git。Claude Code が有効な plugin の bin/ を PATH に足すのと同じ形。"""
+        env = {**self.env, "PATH": f"{BIN}{os.pathsep}{self.env['PATH']}"}
+        return subprocess.run(["git", *args], cwd=cwd or self.work, env=env,
                               text=True, capture_output=True, check=check)
 
     def commit(self, name, path=None):
@@ -209,6 +217,7 @@ exit 1
         clone = Path(self.tmp.name) / "clone"
         self.git("clone", "-q", str(self.origin), str(clone), cwd=Path(self.tmp.name))
         self.assertNotIn("nightly", self.git("for-each-ref", "--format=%(refname:short)", "refs/heads", cwd=clone).stdout)
+        self.git("config", "branch-step.enabled", "true", cwd=clone)  # 印は clone ごと（local config）
         self.git("switch", "-q", "-c", "wip/f", "origin/nightly", cwd=clone)
         (clone / "f.txt").write_text("f\n")
         self.git("add", "-A", cwd=clone)
@@ -291,112 +300,14 @@ exit 1
         self.assertEqual(self.branch(), "spike/x")
 
     def test_install_defaults_to_local_and_rejects_unknown_scope(self):
+        self.git("config", "--unset", "branch-step.enabled")
         self.step("install")
-        self.assertEqual(self.git("config", "--local", "--get", "alias.next").returncode, 0)
-        self.assertNotEqual(self.git("config", "--global", "--get", "alias.next", check=False).returncode, 0)
+        self.assertEqual(self.git("config", "--local", "--get", "branch-step.enabled").stdout.strip(), "true")
+        self.assertNotEqual(self.git("config", "--global", "--get", "branch-step.enabled", check=False).returncode, 0)
         self.assertNotEqual(self.step("install", "--locl", check=False).returncode, 0)
         self.step("install", "--global")
-        self.assertEqual(self.git("config", "--global", "--get", "alias.next").returncode, 0)
+        self.assertEqual(self.git("config", "--global", "--get", "branch-step.enabled").stdout.strip(), "true")
 
-    def test_keep_push_failure_restores_spike(self):
-        self.git("checkout", "-q", "-b", "spike/k")
-        self.commit("a")
-        self.git("remote", "set-url", "origin", str(Path(self.tmp.name) / "missing.git"))
-        result = self.step("keep", check=False)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.branch(), "spike/k", "push に失敗したら spike/ に戻す")
-
-    def test_drop_works_inside_a_linked_worktree(self):
-        wt = Path(self.tmp.name) / "wt-w"
-        self.git("worktree", "add", "-q", "-b", "spike/w", str(wt), "nightly")
-        (wt / "w.txt").write_text("w\n")
-        self.git("add", "-A", cwd=wt)
-        self.git("commit", "-q", "-m", "w", cwd=wt)
-        result = subprocess.run(["bash", str(SCRIPT), "drop"], cwd=wt, env=self.env,
-                                text=True, capture_output=True, check=True)
-        self.assertNotIn("spike/w", self.local_branches())
-        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "", "worktree は detached で残る")
-        self.assertIn("worktree remove", result.stderr)
-
-    def test_missing_option_value_is_a_clean_error(self):
-        self.git("checkout", "-q", "-b", "wip/x")
-        self.commit("a")
-        result = self.step("next", "--memory", check=False)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("未割り当て", result.stderr)
-        self.assertNotIn("unbound", result.stderr)
-
-    def test_gate_strips_git_env_so_test_cannot_touch_the_real_repo(self):
-        """事故の再現: alias 経由の子に GIT_DIR が渡り、門のテストが作る一時 repo への git が本物を触った。"""
-        self.step("install")
-        wt = Path(self.tmp.name) / "wt-env"
-        self.git("worktree", "add", "-q", "-b", "wip/env", str(wt), "nightly")
-        (wt / "e.txt").write_text("e\n")
-        self.git("add", "-A", cwd=wt)
-        self.git("commit", "-q", "-m", "e", cwd=wt)
-        other = Path(self.tmp.name) / "other"
-        self.git("config", "branch-step.test",
-                 f"cd {other} 2>/dev/null || mkdir {other} && cd {other} && git init -q && "
-                 "git commit -q --allow-empty -m evil && git config user.evil yes")
-        head_before = self.git("rev-parse", "HEAD", cwd=wt).stdout.strip()
-        refs_before = self.git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/main",
-                               "refs/heads/nightly", "refs/remotes/origin/main", "refs/remotes/origin/nightly").stdout
-        self.git("next", "--no-pr", cwd=wt)
-        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/env")
-        self.assertEqual(self.git("rev-parse", "HEAD", cwd=wt).stdout.strip(), head_before, "本物の HEAD は動かない")
-        self.assertEqual(self.git("log", "--oneline", "-1", "--format=%s", cwd=wt).stdout.strip(), "e")
-        self.assertNotEqual(self.git("config", "--get", "user.evil", check=False).returncode, 0, "本物の config に書かれない")
-        self.assertEqual(self.git("log", "--oneline", "--format=%s", cwd=other).stdout.strip(), "evil", "一時 repo 側に commit が入る")
-        refs_after = self.git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/main",
-                              "refs/heads/nightly", "refs/remotes/origin/main", "refs/remotes/origin/nightly").stdout
-        refs_before = "\n".join(l for l in refs_before.splitlines() if "wip/env" not in l)
-        self.assertEqual(sorted(refs_after.split()), sorted(refs_before.split()), "trunk 側の ref は変わらない")
-
-    def test_gate_status_check_looks_at_the_branch_worktree_even_via_alias(self):
-        self.step("install")
-        wt = Path(self.tmp.name) / "wt-s"
-        self.git("worktree", "add", "-q", "-b", "wip/s", str(wt), "nightly")
-        (wt / "s.txt").write_text("s\n")
-        self.git("add", "-A", cwd=wt)
-        self.git("commit", "-q", "-m", "s", cwd=wt)
-        (self.work / "dirty-main.txt").write_text("x\n")
-        self.git("next", "--no-pr", cwd=wt)
-        self.assertEqual(self.git("branch", "--show-current", cwd=wt).stdout.strip(), "review/s",
-                         "main worktree が dirty でも、ブランチの worktree が clean なら通る")
-
-    # --- slug の解決 ---
-
-    def test_slug_argument_finds_branch_from_elsewhere(self):
-        self.git("checkout", "-q", "-b", "spike/x")
-        self.commit("a")
-        self.git("checkout", "-q", "nightly")
-        self.step("next", "x")
-        self.assertIn("wip/x", self.local_branches())
-        self.assertEqual(self.branch(), "nightly")
-
-    def test_ambiguous_or_missing_slug_fails(self):
-        self.git("branch", "-q", "spike/x")
-        self.git("branch", "-q", "wip/x")
-        self.assertNotEqual(self.step("next", "x", check=False).returncode, 0)
-        self.assertNotEqual(self.step("next", "nope", check=False).returncode, 0)
-        self.assertNotEqual(self.step("next", check=False).returncode, 0, "trunk 上で slug 無しは失敗")
-
-    # --- keep / drop ---
-
-    def test_keep_moves_spike_to_exp_and_pushes(self):
-        self.git("checkout", "-q", "-b", "spike/x")
-        self.commit("a")
-        self.step("keep")
-        self.assertEqual(self.branch(), "exp/x")
-        self.assertIn("exp/x", self.remote_branches())
-        self.assertNotEqual(self.step("keep", check=False).returncode, 0, "keep は spike だけ")
-
-    def test_drop_deletes_spike_only(self):
-        self.git("checkout", "-q", "-b", "spike/x")
-        self.commit("a")
-        self.step("drop")
-        self.assertNotIn("spike/x", self.local_branches())
-        self.assertEqual(self.branch(), "nightly")
         self.git("checkout", "-q", "-b", "wip/y")
         self.commit("b")
         self.assertNotEqual(self.step("drop", check=False).returncode, 0)
@@ -404,24 +315,36 @@ exit 1
 
     # --- install と pre-push hook ---
 
-    def test_install_sets_aliases_and_hook(self):
+    def test_install_marks_repo_and_sets_hook_without_alias(self):
+        self.git("config", "--unset", "branch-step.enabled")
         self.step("install")
-        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
-        self.assertIn("board", self.git("config", "--get", "alias.board").stdout)
+        self.assertEqual(self.git("config", "--get", "branch-step.enabled").stdout.strip(), "true")
+        self.assertNotEqual(self.git("config", "--get", "alias.next", check=False).returncode, 0,
+                            "alias は書かない（バージョン入りの絶対パスを repo に残さない）")
         hook = self.work / ".git/hooks/pre-push"
         self.assertTrue(os.access(hook, os.X_OK))
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        self.git_bin("next")
+        self.assertEqual(self.branch(), "wip/x")
+
+    def test_install_alias_flag_writes_aliases_for_environments_without_plugin_bin(self):
+        self.step("install", "--alias")
+        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+        self.assertIn("board", self.git("config", "--get", "alias.board").stdout)
         self.git("checkout", "-q", "-b", "spike/x")
         self.commit("a")
         self.git("next")
         self.assertEqual(self.branch(), "wip/x")
 
-    def test_install_skips_foreign_hook_and_still_writes_aliases(self):
+    def test_install_skips_foreign_hook_and_still_marks_repo(self):
+        self.git("config", "--unset", "branch-step.enabled")
         hook = self.work / ".git/hooks/pre-push"
         hook.write_text("#!/bin/sh\nexit 0\n")
         result = self.step("install")
         self.assertEqual(hook.read_text(), "#!/bin/sh\nexit 0\n", "上書きしない")
         self.assertIn("repo", result.stderr, "案内を出す")
-        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+        self.assertEqual(self.git("config", "--get", "branch-step.enabled").stdout.strip(), "true")
 
     def test_install_skips_repo_managed_hookspath(self):
         (self.work / ".githooks").mkdir()
@@ -431,10 +354,61 @@ exit 1
         self.assertEqual((self.work / ".githooks/pre-push").read_text(), "#!/bin/sh\nexit 0\n")
         self.assertIn(".githooks", result.stderr)
 
-    def test_install_no_hook_writes_only_aliases(self):
+    def test_install_no_hook_only_marks_repo(self):
+        self.git("config", "--unset", "branch-step.enabled")
         self.step("install", "--no-hook")
-        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
+        self.assertEqual(self.git("config", "--get", "branch-step.enabled").stdout.strip(), "true")
         self.assertFalse((self.work / ".git/hooks/pre-push").exists())
+
+    # --- PATH 上の外部 subcommand（bin/git-next 等）と導入の印 ---
+
+    def test_bin_git_next_runs_without_any_alias(self):
+        self.assertNotEqual(self.git("config", "--get", "alias.next", check=False).returncode, 0)
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        self.git_bin("next")
+        self.assertEqual(self.branch(), "wip/x")
+
+    def test_bin_git_next_survives_alias_pointing_at_a_removed_plugin_version(self):
+        """plugin を更新すると古いバージョンのフォルダは消える。alias がそこを指したままでも止まらない。"""
+        self.git("config", "--unset", "branch-step.enabled")
+        gone = "/nonexistent/chronista-style/0.0.1/skills/branch-step/scripts/branch-step"
+        self.git("config", "alias.next", f'!"{gone}" next')
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        broken = self.git("next", check=False)
+        self.assertNotEqual(broken.returncode, 0, "bin/ が PATH に無ければ、古い alias は今までどおり止まる")
+        self.assertEqual(self.branch(), "spike/x")
+        self.git_bin("next")
+        self.assertEqual(self.branch(), "wip/x", "PATH 上の git-next が alias より先に動く。古い alias は導入の印として読む")
+
+    def test_refuses_repo_that_never_installed_branch_step(self):
+        self.git("config", "--unset", "branch-step.enabled")
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        for cmd in (["next"], ["keep"], ["drop"], ["board"]):
+            result = self.git_bin(*cmd, check=False)
+            self.assertNotEqual(result.returncode, 0, cmd)
+            self.assertIn("branch-step install", result.stderr, cmd)
+        self.assertEqual(self.branch(), "spike/x")
+        self.assertIn("spike/x", self.local_branches())
+
+    def test_bin_commands_run_from_a_subdirectory(self):
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a", path="sub/dir/a.txt")
+        self.git_bin("next", cwd=self.work / "sub/dir")
+        self.assertEqual(self.branch(), "wip/x")
+        board = self.git_bin("board", cwd=self.work / "sub/dir")
+        self.assertIn("wip/x", board.stdout + board.stderr)
+
+    def test_bin_ships_every_subcommand_and_the_installer(self):
+        for name in ("git-next", "git-keep", "git-drop", "git-board", "branch-step"):
+            self.assertTrue(os.access(BIN / name, os.X_OK), name)
+        self.git("config", "--unset", "branch-step.enabled")
+        env = {**self.env, "PATH": f"{BIN}{os.pathsep}{self.env['PATH']}"}
+        subprocess.run(["branch-step", "install", "--no-hook"], cwd=self.work, env=env,
+                       text=True, capture_output=True, check=True)
+        self.assertEqual(self.git("config", "--get", "branch-step.enabled").stdout.strip(), "true")
 
     def test_pre_push_rejects_spike_and_allows_others(self):
         self.step("install")

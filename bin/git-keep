@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# `git keep` — git は PATH 上の `git-<name>` を外部 subcommand として実行する。
+# Claude Code は有効な plugin の bin/ を、今のバージョンのパスで Bash の PATH に足す。
+# だから plugin を更新すればこのファイルごと新しくなり、repo 側にパスを覚えさせなくて済む。
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/skills/branch-step/scripts/branch-step" keep "$@"
