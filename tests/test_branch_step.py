@@ -24,6 +24,12 @@ class BranchStepTest(unittest.TestCase):
             "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
         }
+        # plugin の bin/（git-next 等）が PATH に入った session から走っても同じ結果にする。
+        # git は PATH 上の git-<name> を alias より先に動かすので、残すと alias を見る test が別の実体を呼ぶ。
+        # bin/ 経由の振る舞いは git_bin() が明示して見る
+        self.env["PATH"] = os.pathsep.join(
+            d for d in self.env.get("PATH", "").split(os.pathsep)
+            if d and not (Path(d) / "git-next").exists())
         (base / "home").mkdir()
         self.origin = base / "origin.git"
         self.git("init", "--bare", "-q", str(self.origin), cwd=base)
