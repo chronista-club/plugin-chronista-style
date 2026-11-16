@@ -9,6 +9,9 @@
 ## [Unreleased]
 
 ### Changed
+- branch-step: `git next` / `keep` / `drop` / `board` の入口を git alias から plugin の `bin/`（`git-next` 等、PATH 上の外部 subcommand）へ移す。alias は plugin のバージョン入りの絶対パスを指していたので、plugin を更新すると `No such file or directory` で止まり、repo ごとに `install` のやり直しが要った。`bin/` は Claude Code が今のバージョンのパスで PATH に足すので、plugin を更新するだけで動く。旧 alias が残った repo もそのまま移行する（PATH 上の命令が alias より先に動く）。SKILL 1.1.0。
+- branch-step: `install` は alias を書かず、導入の印（`git config branch-step.enabled true`）と pre-push hook を入れる。印の無い repo では `git next` 等は断る（旧 alias がある repo は導入済みとして読み、`bin/` 経由で一度動いたら alias を外して印に置き換える。残すと `bin/` を PATH に足さない環境で古いバージョンが黙って動く）。入口として `bin/branch-step` を追加（`branch-step install`）。
+- branch-step: plugin の `bin/` を PATH に足さない環境（Codex など。Codex CLI 0.167.1 で実測）では、agent が SKILL.md の場所から plugin の root を求め、命令ごとに `PATH="<root>/bin:$PATH" git next …` と前置する。SKILL に「呼び方」の節を追加。
 - release: 「版」の表記を「バージョン」に統一（バージョンの検出・正本・書き換え等）。コマンドの description、README、codeflow の参照も同様。
 - release: 比喩の「背骨 / 尻尾」を「共通手順 / 後工程」に言い換え。codeflow・branch-step・README の参照も同様。
 - release: 共通手順に入り込んでいた本リポジトリ専用の分岐（「両環境対応プラグイン」）を「リリース前の検証」に一般化。リポジトリが定める同期・検証を release commit の前に通し、失敗したら止まる。cachebuster の注意はプラグイン形式の後工程の記述に統合。
