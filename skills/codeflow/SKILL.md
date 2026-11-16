@@ -3,7 +3,7 @@ name: codeflow
 description: Spark（想起）から Conception（構想）を経て GO で作業に切り替え、Spec / Design / Guide をコードと同じ PR で育てる開発フロー
 metadata:
   tags: "development, workflow, sdg, spark, conception, second-opinion"
-  version: "4.4.0"
+  version: "4.4.1"
 ---
 
 # Code Flow Skill

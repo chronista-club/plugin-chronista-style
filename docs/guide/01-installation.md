@@ -82,7 +82,7 @@ creo-memories は別途接続する。プラグインのインストールだけ
 
 - Claude Code: creo-memories 側のセットアップ手順に従う。
 - Codex: 既存接続を `codex mcp list` で確認し、接続元が指定した起動コマンドまたは URL で `codex mcp add` を使う。URL や認証情報をこのリポジトリに埋め込まない。
-- 本リポジトリの `.mcp.json.example` は開発用 gitnexus の例。creo-memories の設定ではなく、`bin/setup*` も Codex の接続は作成しない。
+- `bin/setup*` は MCP の接続を作成しない（Claude Code も Codex も）。本リポジトリは MCP の設定例を同梱しない。
 
 接続後に検索ツールの利用を確認する。保存確認はユーザーが指定した内容で行い、実際の memory ID を確認する。未接続時の動作は [記憶接続ガイド](../../skills/chronista-style/reference/memory-connection.md) を参照。
 

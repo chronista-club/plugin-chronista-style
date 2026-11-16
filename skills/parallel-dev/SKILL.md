@@ -2,7 +2,7 @@
 name: parallel-dev
 description: 並列開発の作業単位を決めるとき、スコープが混ざったとき、worktree / VP lane / stacked PR のどれを使うか迷ったときに使用。「隔離・出荷」2層モデルで道具を選ぶ判断スキル。
 metadata:
-  version: "0.2.4"
+  version: "0.2.5"
   tags: "parallel, worktree, vantage-point, stacked-pr, workflow"
 ---
 
@@ -53,5 +53,5 @@ worktree は「作業ディレクトリごと分ける」ので、隔離は構�
 - ❌ 大タスクを単一作業コピーで並列化する（実行隔離がない）
 - ❌ 1つの作業コピーに複数スコープを同居させ、そこでのテスト結果を
   スコープ単体の正しさの根拠にする（単体の保証は worktree か CI の per-PR ビルドで取る）
-- ❌ worktree を切ったまま放置して乱立させる（gitnexus / sem のインデックスが増える。
-  完了したら畳む）
+- ❌ worktree を切ったまま放置して乱立させる（作業コピーと build の成果物が増え、どれが生きているか
+  分からなくなる。完了したら畳む）

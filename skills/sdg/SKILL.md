@@ -2,7 +2,7 @@
 name: sdg
 description: spec / design / guide のひな形を docs/ に起こす。種類と対象は推測して提示し、聞くのは分岐だけ
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # SDG 起動
