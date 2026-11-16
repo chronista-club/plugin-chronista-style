@@ -44,7 +44,7 @@ class DistributionTest(unittest.TestCase):
             with zipfile.ZipFile(output) as archive:
                 names = archive.namelist()
                 self.assertFalse(any(Path(p).name == ".mcp.json" or ".git" in Path(p).parts for p in names))
-                self.assertIn("chronista-style/hooks/transcript.py", names)
+                self.assertIn("chronista-style/hooks/transcript.rb", names)
                 self.assertIn("chronista-style/.codex-plugin/plugin.json", names)
                 self.assertIn("chronista-style/.claude-plugin/plugin.json", names)
                 archive.extractall(root / "unpacked")

@@ -1,21 +1,21 @@
 ---
 name: branch-step
-description: ブランチ名は「今どの段にいるか」だけを語る。段 = prefix（spike / exp / wip / review）、slug は不変。git next / keep / drop で段を進め、spike はローカル専用。ブランチを切る・進める・PR を開く・畳むとき、ブランチ名で迷ったときに使う。
+description: ブランチ名は「今どのステージにいるか」だけを語る。ステージ = prefix（spike / exp / wip / review）、slug は wip 以降不変。git next / keep / drop でステージを進め、spike はローカル専用。ブランチを切る・進める・PR を開く・畳むとき、ブランチ名で迷ったときに使う。
 metadata:
-  version: "1.0.3"
+  version: "1.1.0"
   tags: "git, branch, workflow, parallel-dev, kanban"
   source: "mem_1CfZvzMGQyyyQJLqyZMyR8 (設計と裁定), mem_1CfZz3aDDKfmVm7uRs6w9Z (図)"
 ---
 
-# Branch Step — 段 = prefix、slug は不変
+# Branch Step — ステージ = prefix、slug は wip 以降不変
 
-> **名前は看板ではなくカンバンの列。** 一つの仕事に一つの slug。変わるのは今いる段だけ。
+> **名前は看板ではなくカンバンの列。** 一つの仕事に一つの slug。変わるのは今いるステージだけ。
 
 設計の本文は [design 02](../../docs/design/02-branch-step-naming.md)。ここは使い方。
 
-## 段と語り手
+## ステージと語り手
 
-| 段 | 何をしている | 名前 | 語り手 |
+| ステージ | 何をしている | 名前 | 語り手 |
 |---|---|---|---|
 | 0 | 思いついた。コード無し | ブランチなし | memory |
 | 1 | 探っている。捨ててよい | `spike/<slug>` | ブランチ（**ローカル専用**） |
@@ -28,7 +28,8 @@ metadata:
 別列: `exp/<slug>` = 生かしておく実験。掃除と停滞検知の対象外、閉じるのは本人だけ。
 例外: `hotfix/<slug>` = main 起点の一列。main へ PR、tag、main を nightly へ back-merge。
 
-slug は起票 memory の Branch slug と同じ（`[a-z0-9-]+`、完全一致で探す）。worktree のディレクトリ名も slug。stack 形（`<段>/<epic>/<part>`）は未決なので script は扱わない。
+slug はアクションの Branch slug と同じ（`[a-z0-9-]+`、完全一致で探す）。worktree のディレクトリ名も slug。
+slug が不変なのは `wip/` 以降。`spike/` の名前は仮で、GO で `wip/` にするとき実装内容に合わなければ適切な slug に付け替える（spike はローカル専用なので `git branch -m spike/<old> wip/<new>` で済む。worktree があれば `git worktree move`）。アクションの Meta に書く slug もこの時点で決める。stack 形（`<stage>/<epic>/<part>`）は未決なので script は扱わない。
 起点は全列 nightly なので名前に載せない。type（feat / fix）は commit message の仕事で、ブランチ名には載せない。
 
 ## 操作は三つ
@@ -40,7 +41,7 @@ git drop [<slug>]
 git board
 ```
 
-- **`git next` = 昇格**。`spike/` → `wip/`、`exp/` → `wip/`（どちらも GO の瞬間）、`wip/` → `review/`。
+- **`git next` = 昇格**。`spike/` → `wip/`、`exp/` → `wip/`（どちらも GO の瞬間）、`wip/` → `review/`。slug を付け替えるなら `git next` ではなく `git branch -m`（spike はローカル専用なのでそれだけ。exp からなら remote の古い名前も消す）。
   review に入る時だけ **push して PR を開く**（base は trunk = `nightly`。local に無くても origin にあれば nightly、どちらにも無ければ `main`。body 冒頭に `--memory` の ID）。
   順序は **push が先、rename が後**。push が失敗しても local の名前は変わらない。`wip/` の backup push があれば消して `review/` で押し直す。`review/` から先は rename しない — 直しは PR の中で回す。
   `--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。本物の dry-run ではない）。
@@ -55,18 +56,37 @@ git board
 - PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
 - trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じブランチ」はここで思い出す
 
+## 呼び方 — plugin の `bin/` が PATH に入っているか
+
+`git next` / `keep` / `drop` / `board` と `branch-step` の実体は、この plugin の `bin/` にある。
+
+- **Claude Code**: 有効な plugin の `bin/` を Bash の PATH に足すので、そのまま `git next` と打てる
+- **PATH に足さない環境（Codex など）**: `bin/` が PATH に無く alias も無ければ、`git next` は `'next' is not a git command` で止まる。旧 `install` の alias が残っていると、古いバージョンが動くか、消えたバージョンを指して失敗する。どちらの場合も、**命令ごとに**今の plugin の `bin/` を PATH の先頭に置いて呼ぶ
+
+```bash
+# <plugin の root> = この SKILL.md があるディレクトリの ../..（<root>/skills/branch-step/SKILL.md の <root>）
+PATH="<plugin の root>/bin:$PATH" git next --memory mem_xxx
+PATH="<plugin の root>/bin:$PATH" branch-step install
+```
+
+- root は**今読んでいるこの SKILL.md の場所**から求める。plugin の cache を探して一番新しいバージョンを選ぶ、パスを覚えておく、はしない（有効なバージョンと一致する保証が無い）
+- 前置はその命令だけに効く。`export` しても次の shell 呼び出しには残らないものとして、毎回付ける
+- plugin を更新した後は、新しい session でこの SKILL を読み直す。古い session が覚えている root は、更新で消えていることがある
+
 ## 導入
 
 ```bash
-# repo ごとに一度（alias も hook も今の repo だけ）
-bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install
-# alias だけ入れる（hook は repo 側で管理する repo）
-bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install --no-hook
+# repo ごとに一度（印も hook も今の repo だけ）
+branch-step install
+# 印だけ入れる（hook は repo 側で管理する repo）
+branch-step install --no-hook
 ```
 
-- `git next` / `keep` / `drop` / `board` の alias を今の repo に書く。alias は script の絶対パス（plugin の版ごとのディレクトリ）を指すので、**plugin を更新したら `install` をやり直す**。`--global` は全 repo に効き、更新で全 repo が壊れうるので、agent は mako に確認してから
+- `git next` / `keep` / `drop` / `board` は plugin の `bin/` にある（`git-next` 等）。git は PATH 上の `git-<name>` を subcommand として実行し、Claude Code は有効な plugin の `bin/` を PATH に足す。**plugin を更新するだけで新しい方が動く。`install` のやり直しは要らない**
+- `install` は「この repo は branch-step を使う」印（`git config branch-step.enabled true`）を今の repo に書く。印の無い repo では `git next` 等は断る。旧 `install` が書いた alias が残っている repo は導入済みとして扱うので、移行のためのやり直しも要らない（PATH 上の命令が alias より先に動く）。`bin/` 経由で一度動くと、旧 alias を外して印に置き換える（alias が残ると、`bin/` を PATH に足さない環境で古いバージョンが黙って動くため）
+- `--global` は印を全 repo に付ける。規約に乗っていない repo でも `git next` がブランチを動かすようになるので、agent は mako に確認してから
 - 今いる repo の pre-push（`git rev-parse --git-path hooks`。`core.hooksPath` を尊重）に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。repo ごとに一度 `install` を走らせる
-- **既存の別 pre-push がある repo**（`core.hooksPath = .githooks` で dispatcher を持つ等）では、hook は上書きせず案内だけ出して exit 0（alias は入る）。spike の拒否が要るなら `hooks/pre-push` を dispatcher に vendor する（例: `.githooks/pre-push.d/10-branch-step`）。vendor した hook は plugin の更新で自動では追従しない
+- **既存の別 pre-push がある repo**（`core.hooksPath = .githooks` で dispatcher を持つ等）では、hook は上書きせず案内だけ出して exit 0（印は入る）。spike の拒否が要るなら `hooks/pre-push` を dispatcher に vendor する（例: `.githooks/pre-push.d/10-branch-step`）。vendor した hook は plugin の更新で自動では追従しない
 
 ## 一覧が board
 
@@ -74,7 +94,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install --no
 git board
 ```
 
-`git for-each-ref` を段の列で並べるだけ。`origin/review/*` = レビュー担当の受信箱、`wip/*` で committerdate が古いもの = 停滞、`spike/*` は月次で気兼ねなく消す（`exp/*` は対象外）:
+`git for-each-ref` をステージの列で並べるだけ。`origin/review/*` = レビュー担当の受信箱、`wip/*` で committerdate が古いもの = 停滞、`spike/*` は月次で気兼ねなく消す（`exp/*` は対象外）:
 
 ```bash
 git for-each-ref --format='%(refname:short)' refs/heads/spike/ | xargs -r git branch -D
@@ -86,7 +106,7 @@ git for-each-ref --format='%(refname:short)' refs/heads/spike/ | xargs -r git br
 
 - `review/` → `wip/` の rename（PR を draft に戻す）
 - `train/<epic>`、expand / migrate / contract の三拍、VP lane 名の変更 — 案のまま design の「未決」に
-- release の背骨（nightly → main の merge commit と tag）— `release` スキルが固定点
+- release の共通手順（nightly → main の merge commit と tag）— `release` スキルが固定点
 
 ## 言語について
 

@@ -12,16 +12,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # hooks は Ruby。テストは ruby を PATH から呼ぶ
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
       - run: python -m pip install -r requirements-dev.txt
-      - run: sudo apt-get update && sudo apt-get install -y jq
       - run: python scripts/validate.py
       - run: python -m unittest discover -s tests -v
       # bash -n は第 1 引数しか検査しない（残りは $1 $2 … として渡るだけ）ので、ファイルごとに回す
       - run: |
           shopt -s nullglob
           rc=0
-          for f in hooks/*.sh bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*; do
+          for f in bin/setup bin/setup-windows skills/*/scripts/* skills/*/hooks/*; do
             bash -n "$f" || rc=1
+          done
+          for f in hooks/*.rb; do
+            ruby -wc "$f" >/dev/null || rc=1
           done
           exit $rc
       - run: python scripts/package.py
@@ -29,3 +35,10 @@ jobs:
         with:
           name: chronista-style
           path: dist/chronista-style.zip
+  hooks-system-ruby:
+    # macOS 同梱の ruby 2.6 で hooks を回し、2.6 で動く書き方を機械的に守る（design 06）
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: /usr/bin/ruby --version
+      - run: HOOKS_RUBY=/usr/bin/ruby python3 -m unittest tests.test_hooks -v

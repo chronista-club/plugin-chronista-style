@@ -19,10 +19,10 @@ Claude の `commands/` は入力を共有スキルに渡す薄い入口とする
 
 ## Hooks と記憶接続
 
-- SessionStart は stdin の `cwd` を優先し、省略時のみ `CLAUDE_PROJECT_DIR` / `PWD` にフォールバックする。移動できなければコンテキストを出さない。JSON の入出力には jq を使う。
+- SessionStart は stdin の `cwd` を優先し、省略時のみ `CLAUDE_PROJECT_DIR` / `PWD` にフォールバックする。プロジェクトの情報を取れなくても、規律エッセンスは出し、理由を systemMessage で知らせる。JSON の入出力は Ruby の標準ライブラリ（design 06）。
 - `hooks/hooks.json` は両環境で共有する。Codex が互換用の `CLAUDE_PLUGIN_ROOT` を設定するため、既存のコマンドパスを維持する。Codex では hook 定義の信頼が別途必要。
-- Stop は Python 3 の標準ライブラリで実装する。`transcript.py` が Claude の `message.content` と Codex の `response_item.payload` を読み替える。証拠はセッション全体の tool_result / function_call_output / custom_tool_call_output のテキストだけとする。ユーザーの引用やツール呼び出し引数は証拠にしない。
-- 検査対象は hook 入力の `last_assistant_message` を優先し、省略時はログ中の現在ターンの最終メッセージを使う。Codex の commentary は除外する。欠損・解析失敗・未対応の出力形式では fail-open。`stop_hook_active` の再実行は通し、同一ターンの差し戻しを一回に抑える。
+- Stop は Ruby の標準ライブラリで実装する（design 06）。`transcript.rb` が Claude の `message.content` と Codex の `response_item.payload` を読み替える。証拠はセッション全体の tool_result / function_call_output / custom_tool_call_output のテキストだけとする。ユーザーの引用やツール呼び出し引数は証拠にしない。
+- 検査対象は hook 入力の `last_assistant_message` を優先し、省略時はログ中の現在ターンの最終メッセージを使う。Codex の commentary は除外する。欠損・解析失敗・未対応の出力形式では block せず、exit 1 + stderr で知らせる。`stop_hook_active` の再実行は通し、同一ターンの差し戻しを一回に抑える。
 - 既存の正規表現パターンを保持する。この検査は出力パターンの有無の照合であり、数値や成功状態の一致までは保証しない。
 - 記憶接続は `skills/chronista-style/reference/memory-connection.md` に集約。実際のツール名とスキーマを使い、Atlas 名から ID を捏造しない。未接続でも記憶に依存しない作業を続け、未保存・結果未確認を報告する。
 
@@ -52,3 +52,4 @@ Codex の [公式 Hooks 仕様](https://learn.chatgpt.com/docs/hooks) と手元�
 - 2026-09-06: 公開先は改名せず新設する方針に変更。まず Codex personal への導入と Claude ローカル hook 起動を確認。公開カタログはローカルひな形まで。
 - 2026-09-06: 本体を plugin-chronista-style に新設して正本化。履歴と未コミット作業を引継ぎ、両 manifest の URL と導入文書を新配布先へ更新。Grok は未検証。カタログ更新・commit/push・新配布先での実機確認は未実施。
 - 2026-09-06: v0.32.0 として新本体をリリース。既存8スキルを patch 更新し、新規3スキルは 1.0.0。GitHub Release に ZIP を配布。marketplace 掲載と実機確認は後続のため Draft を維持。
+- 2026-10-30: hooks を Ruby に統一し、失敗を systemMessage / hook error 通知で知らせる形に（design 06）。要件は ruby と git。
