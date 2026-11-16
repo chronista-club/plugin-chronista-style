@@ -63,7 +63,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 
 ## Implementation
 
-- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。先頭で git が `!` alias の子に注入する `GIT_DIR` / `GIT_WORK_TREE` / `GIT_INDEX_FILE` / `GIT_PREFIX` / `GIT_COMMON_DIR` / `GIT_CONFIG_PARAMETERS` 等を剥がす（`GIT_AUTHOR_*` / `GIT_COMMITTER_*` / `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM` / `GIT_SSH*` / `GIT_EDITOR` / `GIT_EXEC_PATH` は残す）。これが無いと別 worktree への `git -C` や門のテストが本物の repo を触る。入口は plugin の `bin/`（`git-next` / `git-keep` / `git-drop` / `git-board` と `branch-step`）で、どれも実体を呼ぶだけ。git は PATH 上の `git-<name>` を外部 subcommand として実行し、Claude Code は有効な plugin の `bin/` を今のバージョンのパスで Bash の PATH に足す。repo 側にパスを書かないので、plugin を更新すれば入口ごと新しくなる。`install` は導入の印（`git config --local branch-step.enabled true`。既定は今の repo だけ、`--global` は明示時のみ）を書き、今いる repo の pre-push（`--git-path hooks`）に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook があれば上書きせず案内だけで exit 0、`--no-hook` で印だけ。`next` / `keep` / `drop` / `board` は印が無い repo では断る（`alias.next` が branch-step を指す repo = 旧 `install` は導入済みとして読む）。`install --alias` は旧来の alias も書く（`bin/` が PATH に入らない環境用。alias は plugin のバージョン入りの絶対パスを指す）
+- 実体は `skills/branch-step/scripts/branch-step`（bash、一つのファイル）。先頭で git が `!` alias の子に注入する `GIT_DIR` / `GIT_WORK_TREE` / `GIT_INDEX_FILE` / `GIT_PREFIX` / `GIT_COMMON_DIR` / `GIT_CONFIG_PARAMETERS` 等を剥がす（`GIT_AUTHOR_*` / `GIT_COMMITTER_*` / `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM` / `GIT_SSH*` / `GIT_EDITOR` / `GIT_EXEC_PATH` は残す）。これが無いと別 worktree への `git -C` や門のテストが本物の repo を触る。入口は plugin の `bin/`（`git-next` / `git-keep` / `git-drop` / `git-board` と `branch-step`）で、どれも実体を呼ぶだけ。git は PATH 上の `git-<name>` を外部 subcommand として実行し、Claude Code は有効な plugin の `bin/` を今のバージョンのパスで Bash の PATH に足す。repo 側にパスを書かないので、plugin を更新すれば入口ごと新しくなる。`install` は導入の印（`git config --local branch-step.enabled true`。既定は今の repo だけ、`--global` は明示時のみ）を書き、今いる repo の pre-push（`--git-path hooks`）に `skills/branch-step/hooks/pre-push` をコピーする。既存の別 hook があれば上書きせず案内だけで exit 0、`--no-hook` で印だけ。`next` / `keep` / `drop` / `board` は印が無い repo では断る（`alias.next` が branch-step を指す repo = 旧 `install` は導入済みとして読む）。`install` は alias を書かない。`bin/` を PATH に足さない環境（Codex など）では、agent が SKILL.md の場所から plugin の root を求め、命令ごとに `PATH="<root>/bin:$PATH" git next …` と前置する
 - slug の解決: slug は `^[a-z0-9-]+$` に限る（stack 形は未決なので拒否）。引数無しなら今のブランチ（ステージの列でなければ失敗）。引数ありならステージごとに `git show-ref --verify` で完全一致を探し、0 件と複数件は失敗。glob や前方一致は使わない（`drop epic` が `spike/epic/a` を消さない）
 - wip → review の門: ブランチが checkout されている worktree（`git worktree list --porcelain`）の中で `git config branch-step.test` を実行して exit 0 を要求。どこにも checkout されていない、または worktree に未 commit の変更があれば止まる（検査した状態と push する状態を一致させる）。trunk との diff に `docs/` 以外の変更があり `docs/design/` が無ければ警告（block しない）。memory ID と `gh` の存在・認証は門より前に確認する（止まったら push も rename もしない）
 - PR 作成は `gh`。`--print-pr` は `gh` を呼ばず PR コマンドを印字する（push と rename は行う。名前を dry-run にしなかったのは、副作用が無いと誤解させないため）
@@ -75,7 +75,7 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `train/<epic>` — 揃うまで待つ乗り物。部品の PR は train 宛て、全部乗ったら nightly へ PR 一本。取り込みは nightly → train の一方通行
 - 同時デプロイをなくす三拍（expand / migrate / contract）と `wip/<slug>-contract` の別 loop
 - stack `<stage>/<epic>/<n>-<part>`（順番は名前に投影、強制は base 鎖）
-- Claude Code 以外（Codex など）で plugin の `bin/` が PATH に入るか。入らない環境では `install --alias` に頼ることになり、バージョン入りのパスの問題が残る
+- 前置なしの `git next` を Codex でも通す仕組み。今は agent が SKILL に従って前置する運用で、SKILL を読まずに打てば `not a git command` で止まる。Codex が plugin の実行ファイルを PATH に載せる仕組みを持てば不要になる
 - vendor した pre-push の版ズレ検出（hook 冒頭に version comment を置き、`install` が比較して警告する等）
 - checkout を使わない release: `git fetch` → `git commit-tree -p origin/main -p origin/nightly <tree>` で merge commit を作り `git push origin <sha>:main` → tag。lane からでも安全に出せるが幅が大きい。まずは worktree の前提確認で止める
 - VP lane のブランチ名（`mako/<name>` → `wip/<slug>`）は VP repo の別 loop。nexus / creo-memories / vantage-point の CLAUDE.md・AGENTS.md 追従も別 loop
@@ -90,7 +90,8 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - `--dry-run` という名前で push や rename を伴う操作を提供する。下見のつもりで実行される
 - `.github/workflows` を触る commit を agent のブランチに混ぜる。OAuth の `workflow` scope が無い token では push が拒否される。CI の変更は mako の手か scope を足した後の別 PR で
 - slug を glob や前方一致で探す。`drop epic` が `spike/epic/a` を消し、`drop '*'` が全部消す
-- repo の設定に plugin のバージョン入りの絶対パスを書く。plugin を更新すると古いバージョンのフォルダは消え、次の `git next` が `No such file or directory` で止まる（vantage-point で 2026-11-14 に起きた: alias は 0.33.2、手元は 0.35.0）。入口は `bin/` に置く。`install --alias` はこの形を承知で使う逃げ道
+- repo の設定に plugin のバージョン入りの絶対パスを書く。plugin を更新すると古いバージョンのフォルダは消え、次の `git next` が `No such file or directory` で止まる（vantage-point で 2026-11-14 に起きた: alias は 0.33.2、手元は 0.35.0）。入口は `bin/` に置く
+- Codex 向けに、VP の lane 起動時の PATH へ plugin の `bin/` を足す / alias が実行時に cache から今のバージョンを探す / hook が固定の symlink を張り直す。どれも「どのバージョンが有効か」を plugin の外（VP、git の設定、home の状態）に解釈させる。有効なバージョンを確実に知っているのは、今読まれている SKILL 自身（vantage-point の codex-bin lane の調査、2026-11-16）
 - `install` の既定を global にする。印が全 repo に付き、規約に乗っていない repo でも `git next` がブランチを動かす
 - git が `!` alias の子に渡す `GIT_DIR` 等をそのまま子プロセスへ流す。creo-memories で実際に起きた: 門のテストが一時 repo を作って git を呼び、`GIT_DIR` が本物を指していたので本物のブランチに commit が増え、`origin/nightly` が update-ref され、共有 config に `user.name` が書かれ、**テストの `git init` が本物の repo を bare として再初期化して `core.bare = true` が入った**（`git init` は GIT_DIR あり / GIT_WORK_TREE なし / cwd が親でないと bare 判定。lead の作業ツリーが取り残され status / diff / pull が壊れた。復旧済み）。script の先頭で剥がす（1.0.1）
 - 門を dirty な worktree で通す。直したが commit し忘れた状態でテストが通り、FAIL の入った commit が push される
@@ -116,3 +117,4 @@ trunk は `refs/heads/nightly` か `refs/remotes/origin/nightly` があれば ni
 - 2026-10-30: mako 裁定 — slug が不変なのは wip 以降。spike の名前は仮で、GO で wip にするとき実装内容と合わなければ適切な slug に付け替える（アクションの Meta もこの時点で決める）。script は未変更（`git branch -m` で足りる）。
 - 2026-10-30: 語彙 — 「段」を **ステージ** と呼ぶ（mako「段をもうちょっとわかりやすい単語に」）。記法は `<stage>/<slug>`。script の利用者向けメッセージとテストの文言も揃えた。動作は変えていない。
 - 2026-11-15: mako 裁定 —「アプデの際に、より安全で、version アプデするだけで、使える方がいい」。`git next` を打つのは agent だけという前提で、入口を git alias から plugin の `bin/`（PATH 上の外部 subcommand）へ移した。alias が担っていた「この repo は導入済み」の役目は `branch-step.enabled` に分けた。PATH 上の `git-next` は repo の alias より先に動く（git 2.56.0 で実測）ので、旧 alias が残った repo もやり直しなしで移行する。1.1.0
+- 2026-11-16: Codex での実測（Hub lead の session、vantage-point の codex-bin lane の chat と console、Codex CLI 0.167.1）で、PATH に plugin を含む要素は無かった。`.codex-plugin/plugin.json` に `bin/` や PATH の宣言は無く、公開の資料でも自動で PATH に載せる仕組みは確認できなかった。mako「OK。いいと思う。」— Codex など `bin/` を PATH に足さない環境では、agent が SKILL.md の場所から root を求めて命令ごとに前置する。`install --alias`（バージョン入りのパスを指す alias を書く逃げ道）は、使う場面が無くなったので入れる前に外した

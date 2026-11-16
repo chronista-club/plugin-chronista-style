@@ -56,6 +56,23 @@ git board
 - PR を開くなら `gh` の存在と認証を push より前に確かめる（PR の無い `review/` を残さない）
 - trunk との diff に `docs/` 以外の変更があり `docs/design/` に変更が無ければ**警告**（止めない。設計に触れたかは機械では決めきれない）。`verification` の「設計に触れた変更なら design が同じブランチ」はここで思い出す
 
+## 呼び方 — plugin の `bin/` が PATH に入っているか
+
+`git next` / `keep` / `drop` / `board` と `branch-step` の実体は、この plugin の `bin/` にある。
+
+- **Claude Code**: 有効な plugin の `bin/` を Bash の PATH に足すので、そのまま `git next` と打てる
+- **PATH に足さない環境（Codex など）**: `git next` は `'next' is not a git command` で止まる。**命令ごとに** plugin の `bin/` を PATH の先頭に置いて呼ぶ
+
+```bash
+# <plugin の root> = この SKILL.md から 2 つ上のディレクトリ（<root>/skills/branch-step/SKILL.md）
+PATH="<plugin の root>/bin:$PATH" git next --memory mem_xxx
+PATH="<plugin の root>/bin:$PATH" branch-step install
+```
+
+- root は**今読んでいるこの SKILL.md の場所**から求める。plugin の cache を探して一番新しいバージョンを選ぶ、パスを覚えておく、はしない（有効なバージョンと一致する保証が無い）
+- 前置はその命令だけに効く。`export` しても次の shell 呼び出しには残らないものとして、毎回付ける
+- plugin を更新した後は、新しい session でこの SKILL を読み直す。古い session が覚えている root は、更新で消えていることがある
+
 ## 導入
 
 ```bash
@@ -68,7 +85,6 @@ branch-step install --no-hook
 - `git next` / `keep` / `drop` / `board` は plugin の `bin/` にある（`git-next` 等）。git は PATH 上の `git-<name>` を subcommand として実行し、Claude Code は有効な plugin の `bin/` を PATH に足す。**plugin を更新するだけで新しい方が動く。`install` のやり直しは要らない**
 - `install` は「この repo は branch-step を使う」印（`git config branch-step.enabled true`）を今の repo に書く。印の無い repo では `git next` 等は断る。旧 `install` が書いた alias が残っている repo は導入済みとして扱うので、移行のためのやり直しも要らない（PATH 上の命令が alias より先に動く）
 - `--global` は印を全 repo に付ける。規約に乗っていない repo でも `git next` がブランチを動かすようになるので、agent は mako に確認してから
-- `branch-step` が見つからない環境（plugin の `bin/` が PATH に入らない）では `bash "${CLAUDE_PLUGIN_ROOT}/skills/branch-step/scripts/branch-step" install --alias`。旧来の git alias も書く。alias は plugin のバージョン入りの絶対パスを指すので、plugin を更新したら `install --alias` をやり直す
 - 今いる repo の pre-push（`git rev-parse --git-path hooks`。`core.hooksPath` を尊重）に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。repo ごとに一度 `install` を走らせる
 - **既存の別 pre-push がある repo**（`core.hooksPath = .githooks` で dispatcher を持つ等）では、hook は上書きせず案内だけ出して exit 0（印は入る）。spike の拒否が要るなら `hooks/pre-push` を dispatcher に vendor する（例: `.githooks/pre-push.d/10-branch-step`）。vendor した hook は plugin の更新で自動では追従しない
 

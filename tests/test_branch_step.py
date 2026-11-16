@@ -334,14 +334,26 @@ exit 1
         self.git_bin("next")
         self.assertEqual(self.branch(), "wip/x")
 
-    def test_install_alias_flag_writes_aliases_for_environments_without_plugin_bin(self):
-        self.step("install", "--alias")
-        self.assertIn("next", self.git("config", "--get", "alias.next").stdout)
-        self.assertIn("board", self.git("config", "--get", "alias.board").stdout)
+    def test_install_never_writes_an_alias(self):
+        """alias は plugin のバージョン入りの絶対パスを repo に残す。書く経路そのものを持たない。"""
+        result = self.step("install", "--alias", check=False)
+        self.assertNotEqual(result.returncode, 0, "--alias は無い")
+        self.step("install")
+        for name in ("next", "keep", "drop", "board"):
+            self.assertNotEqual(self.git("config", "--get", f"alias.{name}", check=False).returncode, 0, name)
+
+    def test_per_command_path_prefix_is_enough_where_bin_is_not_on_path(self):
+        """Codex など plugin の bin/ を PATH に足さない環境の呼び方: 命令ごとに PATH を前置する。"""
+        self.assertIsNone(__import__("shutil").which("git-next", path=self.env["PATH"]))
         self.git("checkout", "-q", "-b", "spike/x")
         self.commit("a")
-        self.git("next")
-        self.assertEqual(self.branch(), "wip/x")
+        missing = self.git("next", check=False)
+        self.assertNotEqual(missing.returncode, 0, "前置しなければ git next は見つからない")
+        run = subprocess.run(f'PATH="{BIN}:$PATH" git next', shell=True, cwd=self.work, env=self.env,
+                             text=True, capture_output=True, check=True)
+        self.assertEqual(self.branch(), "wip/x", run.stderr)
+        after = self.git("board", check=False)
+        self.assertNotEqual(after.returncode, 0, "前置は その命令だけに効く。後続の shell には残らない")
 
     def test_install_skips_foreign_hook_and_still_marks_repo(self):
         self.git("config", "--unset", "branch-step.enabled")

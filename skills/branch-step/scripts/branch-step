@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # 入口は plugin の bin/（git-next / git-keep / git-drop / git-board / branch-step）。git は PATH 上の
-# `git-<name>` を外部 subcommand として実行する。`install --alias` を使った repo では `!` alias からも来る。
+# `git-<name>` を外部 subcommand として実行する。旧 install が書いた `!` alias が残る repo では alias からも来る。
 # git は `!` alias の子に GIT_DIR / GIT_PREFIX / GIT_WORK_TREE 等を渡す。そのままだと別 worktree への
 # `git -C` や門のテストが作る一時 repo への git が、本物の repo を触る。ここで剥がす（作者情報や認証は残す）
 for _v in $(compgen -e | grep '^GIT_' || true); do
@@ -29,13 +29,12 @@ branch-step — ステージ = prefix、slug は wip 以降不変
   git keep [<slug>]      spike→exp（rename + 初 push）。育てる
   git drop [<slug>]      spike を削除。無言でよい
   git board              ステージごとの ref 一覧（committerdate 順）
-  branch-step install [--local|--global] [--no-hook] [--alias]
+  branch-step install [--local|--global] [--no-hook]
       この repo で branch-step を使う印（git config branch-step.enabled）と pre-push hook を入れる
       既定は今の repo だけ。既存の別 pre-push があれば hook は入れずに案内だけ（exit 0）。--no-hook で印だけ
-      --alias は git alias（next / keep / drop / board）も書く。plugin の bin/ が PATH に入らない環境用で、
-      alias は plugin のバージョン入りの絶対パスを指す（plugin を更新したら install --alias をやり直す）
 
-git next などは plugin の bin/ にある（Claude Code が PATH に足す）。印の無い repo では動かない
+git next などは plugin の bin/ にある。Claude Code は bin/ を PATH に足す。足さない環境（Codex など）では
+命令ごとに PATH="<plugin の root>/bin:$PATH" git next … と前置する（SKILL.md「呼び方」）。印の無い repo では動かない
 EOF
 }
 
@@ -246,27 +245,19 @@ cmd_board() {
 }
 
 cmd_install() {
-  local scope="--local" no_hook=0 alias=0 self hooks_dir hook
+  local scope="--local" no_hook=0 hooks_dir hook
   while [ $# -gt 0 ]; do
     case "$1" in
       --local) scope="--local" ;;
       --global) scope="--global" ;;
       --no-hook) no_hook=1 ;;
-      --alias) alias=1 ;;
-      *) die "install の引数は --local（既定）/ --global / --no-hook / --alias だけ: $1" ;;
+      *) die "install の引数は --local（既定）/ --global / --no-hook だけ: $1" ;;
     esac
     shift
   done
+  # alias は書かない。alias は plugin のバージョン入りの絶対パスを repo に残し、plugin の更新で止まる
   git config "$scope" branch-step.enabled true
   note "導入の印 ($scope): branch-step.enabled = true。git next / keep / drop / board は plugin の bin/ から動く"
-  if [ "$alias" -eq 1 ]; then
-    self="$HERE/branch-step"
-    for name in next keep drop board; do
-      git config "$scope" "alias.$name" "!\"$self\" $name"
-    done
-    note "git alias ($scope): next / keep / drop / board -> $self"
-    note "  このパスは plugin のバージョンに紐づく。plugin を更新したら install --alias をやり直す"
-  fi
   if [ "$no_hook" -eq 1 ]; then
     note "pre-push hook は入れない（--no-hook）。spike/* の push 拒否は repo 側の hook に任せる"
     return
