@@ -400,6 +400,35 @@ exit 1
         self.git_bin("next")
         self.assertEqual(self.branch(), "wip/x", "PATH 上の git-next が alias より先に動く。古い alias は導入の印として読む")
 
+    def test_first_run_through_bin_retires_the_old_alias(self):
+        """旧 alias を残すと、bin/ が PATH に無い環境で古いバージョンが黙って動くか、消えたパスで止まる。
+        bin/ 経由で一度動いたら、印に置き換えて alias を消す。"""
+        self.git("config", "--unset", "branch-step.enabled")
+        for name in ("next", "keep", "drop", "board"):
+            self.git("config", f"alias.{name}", f'!"{SCRIPT}" {name}')
+        self.git("config", "alias.co", "checkout")
+        self.git("checkout", "-q", "-b", "spike/x")
+        self.commit("a")
+        result = self.git_bin("next")
+        self.assertEqual(self.branch(), "wip/x")
+        self.assertIn("alias", result.stderr, "何をしたかを告げる")
+        self.assertEqual(self.git("config", "--local", "--get", "branch-step.enabled").stdout.strip(), "true")
+        for name in ("next", "keep", "drop", "board"):
+            self.assertNotEqual(self.git("config", "--get", f"alias.{name}", check=False).returncode, 0, name)
+        self.assertEqual(self.git("config", "--get", "alias.co").stdout.strip(), "checkout", "他の alias は触らない")
+        bare = self.git("board", check=False)
+        self.assertNotEqual(bare.returncode, 0, "前置なしは、古い実体が動くのではなく明確に止まる")
+        self.assertIn("not a git command", bare.stderr)
+
+    def test_old_global_alias_is_retired_in_the_global_scope(self):
+        self.git("config", "--unset", "branch-step.enabled")
+        for name in ("next", "keep", "drop", "board"):
+            self.git("config", "--global", f"alias.{name}", f'!"{SCRIPT}" {name}')
+        self.git_bin("board")
+        self.assertEqual(self.git("config", "--global", "--get", "branch-step.enabled").stdout.strip(), "true")
+        self.assertNotEqual(self.git("config", "--local", "--get", "branch-step.enabled", check=False).returncode, 0)
+        self.assertNotEqual(self.git("config", "--get", "alias.next", check=False).returncode, 0)
+
     def test_refuses_repo_that_never_installed_branch_step(self):
         self.git("config", "--unset", "branch-step.enabled")
         self.git("checkout", "-q", "-b", "spike/x")

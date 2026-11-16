@@ -130,14 +130,36 @@ gate() {
   fi
 }
 
+# 旧 install が書いた git alias（plugin のバージョン入りの絶対パスを指す）を外し、導入の印に置き換える。
+# 残すと、plugin の bin/ が PATH に無い環境で `git next` が alias に落ち、古いバージョンが黙って動くか、
+# 消えたパスで止まる。外せば前置なしの `git next` は `not a git command` で明確に止まる。
+# branch-step を指す alias だけを、それが書かれている scope で外す。1 つでも外したら 0 を返す。
+retire_old_aliases() {
+  local scope name found=1
+  for scope in --local --global; do
+    case "$(git config "$scope" --get alias.next 2>/dev/null || true)" in
+      *branch-step*) ;;
+      *) continue ;;
+    esac
+    git config "$scope" branch-step.enabled true
+    for name in next keep drop board; do
+      case "$(git config "$scope" --get "alias.$name" 2>/dev/null || true)" in
+        *branch-step*) git config "$scope" --unset "alias.$name" ;;
+      esac
+    done
+    note "旧 install の git alias ($scope) を外し、導入の印 branch-step.enabled に置き換えました（入口は plugin の bin/）"
+    found=0
+  done
+  return "$found"
+}
+
 # この repo が branch-step を導入しているか。bin/ の命令は plugin が有効ならどの repo でも呼べるので、
 # 規約に乗っていない repo のブランチを動かさないよう、印が無ければ断る。
-# 印 = git config branch-step.enabled。alias が branch-step を指している repo（旧 install）も導入済みとして読む。
+# 印 = git config branch-step.enabled。alias が branch-step を指している repo（旧 install）は導入済みとして
+# 読み、その場で印に置き換える。
 require_installed() {
+  if retire_old_aliases; then return; fi
   [ "$(git config --type=bool --get branch-step.enabled 2>/dev/null || true)" = "true" ] && return
-  case "$(git config --get alias.next 2>/dev/null || true)" in
-    *branch-step*) return ;;
-  esac
   die "この repo は branch-step を導入していません。使うなら先に: branch-step install"
 }
 
@@ -256,6 +278,7 @@ cmd_install() {
     shift
   done
   # alias は書かない。alias は plugin のバージョン入りの絶対パスを repo に残し、plugin の更新で止まる
+  retire_old_aliases || true
   git config "$scope" branch-step.enabled true
   note "導入の印 ($scope): branch-step.enabled = true。git next / keep / drop / board は plugin の bin/ から動く"
   if [ "$no_hook" -eq 1 ]; then

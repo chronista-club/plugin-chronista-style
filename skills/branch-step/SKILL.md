@@ -61,10 +61,10 @@ git board
 `git next` / `keep` / `drop` / `board` と `branch-step` の実体は、この plugin の `bin/` にある。
 
 - **Claude Code**: 有効な plugin の `bin/` を Bash の PATH に足すので、そのまま `git next` と打てる
-- **PATH に足さない環境（Codex など）**: `git next` は `'next' is not a git command` で止まる。**命令ごとに** plugin の `bin/` を PATH の先頭に置いて呼ぶ
+- **PATH に足さない環境（Codex など）**: `bin/` が PATH に無く alias も無ければ、`git next` は `'next' is not a git command` で止まる。旧 `install` の alias が残っていると、古いバージョンが動くか、消えたバージョンを指して失敗する。どちらの場合も、**命令ごとに**今の plugin の `bin/` を PATH の先頭に置いて呼ぶ
 
 ```bash
-# <plugin の root> = この SKILL.md から 2 つ上のディレクトリ（<root>/skills/branch-step/SKILL.md）
+# <plugin の root> = この SKILL.md があるディレクトリの ../..（<root>/skills/branch-step/SKILL.md の <root>）
 PATH="<plugin の root>/bin:$PATH" git next --memory mem_xxx
 PATH="<plugin の root>/bin:$PATH" branch-step install
 ```
@@ -83,7 +83,7 @@ branch-step install --no-hook
 ```
 
 - `git next` / `keep` / `drop` / `board` は plugin の `bin/` にある（`git-next` 等）。git は PATH 上の `git-<name>` を subcommand として実行し、Claude Code は有効な plugin の `bin/` を PATH に足す。**plugin を更新するだけで新しい方が動く。`install` のやり直しは要らない**
-- `install` は「この repo は branch-step を使う」印（`git config branch-step.enabled true`）を今の repo に書く。印の無い repo では `git next` 等は断る。旧 `install` が書いた alias が残っている repo は導入済みとして扱うので、移行のためのやり直しも要らない（PATH 上の命令が alias より先に動く）
+- `install` は「この repo は branch-step を使う」印（`git config branch-step.enabled true`）を今の repo に書く。印の無い repo では `git next` 等は断る。旧 `install` が書いた alias が残っている repo は導入済みとして扱うので、移行のためのやり直しも要らない（PATH 上の命令が alias より先に動く）。`bin/` 経由で一度動くと、旧 alias を外して印に置き換える（alias が残ると、`bin/` を PATH に足さない環境で古いバージョンが黙って動くため）
 - `--global` は印を全 repo に付ける。規約に乗っていない repo でも `git next` がブランチを動かすようになるので、agent は mako に確認してから
 - 今いる repo の pre-push（`git rev-parse --git-path hooks`。`core.hooksPath` を尊重）に [hook](hooks/pre-push) を置く。`refs/heads/spike/*` の push を拒否する（`spike/x:wip/x` や `HEAD:wip/x` の別名も拒否、削除は通す）。`<sha>:refs/heads/…` のように sha を直に指す push は止められない（仕様。`spike/x~0:` のような revision 式は止める）。repo ごとに一度 `install` を走らせる
 - **既存の別 pre-push がある repo**（`core.hooksPath = .githooks` で dispatcher を持つ等）では、hook は上書きせず案内だけ出して exit 0（印は入る）。spike の拒否が要るなら `hooks/pre-push` を dispatcher に vendor する（例: `.githooks/pre-push.d/10-branch-step`）。vendor した hook は plugin の更新で自動では追従しない
