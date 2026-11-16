@@ -8,6 +8,8 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-17
+
 ### Changed
 - gitnexus の記述を外す: MCP の設定例 `.mcp.json.example`（中身は gitnexus）を削除し、配布の一覧と guide 01 から外した。parallel-dev の「gitnexus / sem のインデックスが増える」を、実態（作業コピーと build の成果物が増える）に直した。
 - guide 02: 確認した版を sem 0.30.1 / mbx 1.11.1 に更新（記載の `sem find` / `impact` / `certify` / `history` は 0.30.1 で通ることを確認）。sem の MCP は「繋いでいる環境では」の条件付きに。
