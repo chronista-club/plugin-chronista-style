@@ -2,7 +2,7 @@
 name: spark
 description: 降ってきたアイデアをそのまま memory に pack する。解釈ゼロ、一手で終わる
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Spark

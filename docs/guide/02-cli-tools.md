@@ -3,7 +3,7 @@
 ## 入口
 
 実行する環境の `sem --version` / `mbx --version` と各 `--help` を確認する。
-以下は sem 0.27.0 / mbx 1.11.1 で確認した手順。新しい版の引数を古い版に持ち込まない。
+以下は sem 0.30.1 / mbx 1.11.1 で確認した手順。新しい版の引数を古い版に持ち込まない。
 
 グローバル CLI は Homebrew を優先する。sem の formula は **sem-cli**（Semgrep とは別物）。
 Rust toolchain は rustup、mise はタスクとプロジェクト固有ランタイムに使う。
@@ -20,7 +20,7 @@ sem history --blame src/config.ts --json
 
 名前・ファイル・比較対象のブランチは対象プロジェクトに合わせる。
 文字列検索は `rg`、呼び出し関係や変更単位の調査に sem を使う。
-MCP では接続中の `tools/list` の名前と引数に従う。
+sem の MCP を繋いでいる環境では、接続中の `tools/list` の名前と引数に従う（繋がなくても CLI だけで使える）。
 
 `sem check` を使う場合も、プロジェクト指定の検証を網羅するか checker と対象範囲を読む。
 終了コード 2 は判定不能。独自の `mise run check` / CI を省略する根拠にはしない。

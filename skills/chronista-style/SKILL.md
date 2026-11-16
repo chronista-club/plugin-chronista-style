@@ -2,7 +2,7 @@
 name: chronista-style
 description: Chronista として活動するスキルセットの入口。North Star・設計哲学・基本姿勢・プロジェクト管理の規約を定義し、各スキルへ routing する。
 metadata:
-  version: "6.1.5"
+  version: "6.1.6"
   tags: "chronista, development, workflow, memory"
 ---
 

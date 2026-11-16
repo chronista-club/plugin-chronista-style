@@ -2,7 +2,7 @@
 name: release
 description: リリースの共通手順 — バージョンの検出・CHANGELOG・release commit・nightly → main・tag・GitHub Release。後工程（CI / publish / 署名 / 配置）はプロジェクト側に委譲
 metadata:
-  version: "1.0.3"
+  version: "1.0.4"
 ---
 
 # Release

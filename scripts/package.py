@@ -6,7 +6,7 @@ import zipfile
 
 from validate import ROOT, validate
 
-FILES = (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "README.md", "LICENSE", "CHANGELOG.md", "requirements-dev.txt", ".mcp.json.example")
+FILES = (".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "README.md", "LICENSE", "CHANGELOG.md", "requirements-dev.txt")
 TREES = ("skills", "commands", "hooks", "docs", "scripts", "tests", "bin")
 
 

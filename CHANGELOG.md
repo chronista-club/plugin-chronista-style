@@ -9,6 +9,9 @@
 ## [Unreleased]
 
 ### Changed
+- gitnexus の記述を外す: MCP の設定例 `.mcp.json.example`（中身は gitnexus）を削除し、配布の一覧と guide 01 から外した。parallel-dev の「gitnexus / sem のインデックスが増える」を、実態（作業コピーと build の成果物が増える）に直した。
+- guide 02: 確認した版を sem 0.30.1 / mbx 1.11.1 に更新（記載の `sem find` / `impact` / `certify` / `history` は 0.30.1 で通ることを確認）。sem の MCP は「繋いでいる環境では」の条件付きに。
+- 中身が変わっていたのに `metadata.version` が上がっていなかった skill の patch を上げた（chronista-style / codeflow / parallel-dev / release / sdg / spark / spec-design-guide / tdd / verification）。
 - branch-step: `git next` / `keep` / `drop` / `board` の入口を git alias から plugin の `bin/`（`git-next` 等、PATH 上の外部 subcommand）へ移す。alias は plugin のバージョン入りの絶対パスを指していたので、plugin を更新すると `No such file or directory` で止まり、repo ごとに `install` のやり直しが要った。`bin/` は Claude Code が今のバージョンのパスで PATH に足すので、plugin を更新するだけで動く。旧 alias が残った repo もそのまま移行する（PATH 上の命令が alias より先に動く）。SKILL 1.1.0。
 - branch-step: `install` は alias を書かず、導入の印（`git config branch-step.enabled true`）と pre-push hook を入れる。印の無い repo では `git next` 等は断る（旧 alias がある repo は導入済みとして読み、`bin/` 経由で一度動いたら alias を外して印に置き換える。残すと `bin/` を PATH に足さない環境で古いバージョンが黙って動く）。入口として `bin/branch-step` を追加（`branch-step install`）。
 - branch-step: plugin の `bin/` を PATH に足さない環境（Codex など。Codex CLI 0.167.1 で実測）では、agent が SKILL.md の場所から plugin の root を求め、命令ごとに `PATH="<root>/bin:$PATH" git next …` と前置する。SKILL に「呼び方」の節を追加。
