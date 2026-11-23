@@ -48,15 +48,28 @@ module Transcript
   #   prose: 現在ターンの最終 assistant メッセージ（新しい prompt が来たら空に戻す）
   #   tools: セッション全体の tool result を改行で連結
   def self.read(path)
+    # Antigravity (agy) は transcript.jsonl の長い content を切り詰め、隣に transcript_full.jsonl を置く。
+    # 証拠が切り詰められていると誤検知するため、transcript_full.jsonl があればそちらを読む。
+    read_path = path
+    if File.basename(path) == "transcript.jsonl"
+      full_candidate = File.join(File.dirname(path), "transcript_full.jsonl")
+      read_path = full_candidate if File.file?(full_candidate)
+    end
     prose = ""
     tools = []
     formats = {}
     opaque = false
-    File.foreach(path, encoding: "UTF-8") do |line|
+    File.foreach(read_path, encoding: "UTF-8") do |line|
       next if line.strip.empty?
 
       row = JSON.parse(line)
       raise UnknownFormat, "transcript row is not an object: #{row.class}" unless row.is_a?(Hash)
+
+      if row["source"].is_a?(String) && row["type"].is_a?(String) && !row.key?("message") && !row.key?("payload")
+        formats["agy"] = true
+        prose = read_agy(row, prose, tools)
+        next
+      end
 
       case row["type"]
       when "user", "assistant"
@@ -78,6 +91,21 @@ module Transcript
     raise OpaqueEvidence, "encrypted tool output" if opaque
 
     [prose, tools.join("\n")]
+  end
+
+  def self.read_agy(row, prose, tools)
+    content = row["content"].is_a?(String) ? row["content"] : ""
+    case row["type"]
+    when "USER_INPUT"
+      ""
+    when "PLANNER_RESPONSE"
+      content.empty? ? prose : content
+    when "SYSTEM_MESSAGE"
+      prose
+    else
+      tools << content unless content.empty?
+      prose
+    end
   end
 
   def self.read_claude(row, prose, tools)

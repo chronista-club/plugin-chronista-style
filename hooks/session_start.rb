@@ -63,9 +63,10 @@ rescue JSON::ParserError => e
   {}
 end
 
-# stdin の cwd がホストの契約。環境変数は旧経路の fallback（空は未設定と同じ）
+# stdin の cwd がホストの契約（Antigravity は cwd または workspacePaths[0]）。環境変数は旧経路の fallback（空は未設定と同じ）
 def project_dir(event)
   cwd = event["cwd"]
+  cwd = event["workspacePaths"].first if (!cwd.is_a?(String) || cwd.empty?) && event["workspacePaths"].is_a?(Array)
   dir = if cwd.is_a?(String) && !cwd.empty?
           cwd
         else
@@ -139,23 +140,32 @@ def context(project, atlas)
   parts.join("\n\n")
 end
 
+def agy_event?(event)
+  event.key?("hookEventName") || event.key?("conversationId") || event.key?("workspacePaths")
+end
+
+def format_output(event, ctx, notice)
+  if agy_event?(event)
+    text = notice ? "#{ctx}\n\n> #{notice}" : ctx
+    { "injectSteps" => [{ "systemMessage" => { "systemMessage" => text } }] }
+  else
+    out = { "hookSpecificOutput" => { "hookEventName" => "SessionStart", "additionalContext" => ctx } }
+    out["systemMessage"] = notice if notice
+    out
+  end
+end
+
 def main
   warnings = []
   event = parse_event(warnings)
   project, atlas = project_context(event, warnings)
-  output = {
-    "hookSpecificOutput" => { "hookEventName" => "SessionStart", "additionalContext" => context(project, atlas) },
-  }
-  output["systemMessage"] = "#{HOOK}: #{warnings.join('。')}" unless warnings.empty?
-  puts JSON.generate(output)
+  notice = warnings.empty? ? nil : "#{HOOK}: #{warnings.join('。')}"
+  puts JSON.generate(format_output(event, context(project, atlas), notice))
 rescue StandardError => e
   # ここまで来るのは想定外。セッションは止めず、プロジェクトに依らない部分だけ出して、何がコケたかを知らせる
   message = "#{HOOK}: #{e.class}: #{first_line(e.message)}"
   warn message
-  puts JSON.generate(
-    "hookSpecificOutput" => { "hookEventName" => "SessionStart", "additionalContext" => context(nil, nil) },
-    "systemMessage" => message,
-  )
+  puts JSON.generate(format_output(event || {}, context(nil, nil), message))
 end
 
 main
