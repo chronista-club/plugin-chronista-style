@@ -26,6 +26,14 @@ def codex(kind, **fields):
     return {"type": "response_item", "payload": {"type": kind, **fields}}
 
 
+def agy(source, kind, content="", **fields):
+    row = {"source": source, "type": kind, "status": "DONE"}
+    if content:
+        row["content"] = content
+    row.update(fields)
+    return row
+
+
 class HooksTest(unittest.TestCase):
     def run_raw(self, name, stdin, **kwargs):
         return subprocess.run(
@@ -280,6 +288,65 @@ class HooksTest(unittest.TestCase):
             out = json.loads(result.stdout)
             self.assertIn(Path(directory).name, out["hookSpecificOutput"]["additionalContext"])
             self.assertIn("git", out["systemMessage"])
+
+    def test_agy_session_start_injects_system_message_and_uses_workspace_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run(["git", "init", "-q", directory], check=True)
+            subprocess.run(["git", "-C", directory, "symbolic-ref", "HEAD", "refs/heads/agy-test"], check=True)
+            result = self.run_hook("session_start.rb", {
+                "hookEventName": "SessionStart",
+                "conversationId": "conv-1",
+                "workspacePaths": [directory],
+            }, cwd=ROOT)
+            steps = result["injectSteps"]
+            self.assertEqual(len(steps), 1)
+            msg = steps[0]["systemMessage"]["systemMessage"]
+            self.assertIn("agy-test", msg)
+            self.assertIn("規律エッセンス", msg)
+            self.assertNotIn("hookSpecificOutput", result)
+
+    def test_agy_stop_hook_reads_transcript_and_returns_continue_on_violation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_transcript(directory, [
+                agy("USER_EXPLICIT", "USER_INPUT", "run tests"),
+                agy("MODEL", "PLANNER_RESPONSE", "test result: ok"),
+            ])
+            blocked = self.run_hook("fabrication_tripwire.rb", {
+                "hookEventName": "Stop",
+                "transcriptPath": path,
+                "continuationActive": False,
+            })
+            self.assertEqual(blocked.get("decision"), "continue")
+            self.assertIn("test result:", blocked.get("reason", ""))
+
+            # continuationActive=True なら再差し戻ししない
+            not_looping = self.run_hook("fabrication_tripwire.rb", {
+                "hookEventName": "Stop",
+                "transcriptPath": path,
+                "continuationActive": True,
+            })
+            self.assertEqual(not_looping, {})
+
+            # GENERIC tool 出力に証拠があれば通す（truncated の時は transcript_full.jsonl を読む）
+            full_path = Path(directory) / "transcript_full.jsonl"
+            records_compact = [
+                agy("USER_EXPLICIT", "USER_INPUT", "run tests"),
+                agy("MODEL", "GENERIC", "truncated...", truncated_fields=["content"]),
+                agy("MODEL", "PLANNER_RESPONSE", "test result: ok"),
+            ]
+            records_full = [
+                agy("USER_EXPLICIT", "USER_INPUT", "run tests"),
+                agy("MODEL", "GENERIC", "test result: ok"),
+                agy("MODEL", "PLANNER_RESPONSE", "test result: ok"),
+            ]
+            path = self.write_transcript(directory, records_compact)
+            full_path.write_text("\n".join(json.dumps(r) for r in records_full) + "\n")
+            passed = self.run_hook("fabrication_tripwire.rb", {
+                "hookEventName": "Stop",
+                "transcriptPath": path,
+                "continuationActive": False,
+            })
+            self.assertEqual(passed, {})
 
 
 if __name__ == "__main__":

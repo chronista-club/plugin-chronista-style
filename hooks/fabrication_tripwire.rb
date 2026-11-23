@@ -35,13 +35,24 @@ REASON_TAIL = "Run the real tool and quote its ACTUAL output, or delete the unba
               "For deliberate example quotations, add TRIPWIRE-ACK on a line by itself. " \
               "Never report a result you did not observe."
 
+def agy_event?(event)
+  event.key?("hookEventName") || event.key?("conversationId") || event.key?("transcriptPath") || event.key?("continuationActive")
+end
+
 # => block の指示（Hash）か nil
 def check(event)
   # 差し戻しは 1 ターンに 1 回。どちらのホストもループに落とさない
-  return nil if event["stop_hook_active"] == true
+  return nil if event["stop_hook_active"] == true || event["continuationActive"] == true
 
+  is_agy = agy_event?(event)
   # Codex は transcript_path を string | null と定義する。無ければ検査できないが、異常ではない
-  path = event.fetch("transcript_path")
+  path = if event.key?("transcript_path")
+           event["transcript_path"]
+         elsif event.key?("transcriptPath")
+           event["transcriptPath"]
+         else
+           raise KeyError, "key not found: \"transcript_path\""
+         end
   return nil if path.nil?
 
   prose, tools = begin
@@ -61,7 +72,8 @@ def check(event)
   end.compact
   return nil if violations.empty?
 
-  { "decision" => "block", "reason" => [REASON_HEAD, *violations, REASON_TAIL].join("\n") }
+  decision = is_agy ? "continue" : "block"
+  { "decision" => decision, "reason" => [REASON_HEAD, *violations, REASON_TAIL].join("\n") }
 end
 
 def main
